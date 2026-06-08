@@ -29,7 +29,7 @@
 
 - **Python 3.11+** — [下载](https://www.python.org/downloads/)
 - **uv** 包管理器 — `pip install uv`
-- **DeepSeek API Key** — [免费注册](https://platform.deepseek.com/)，充 ¥1 能用很久
+- **DeepSeek API Key** — [免费注册](https://platform.deepseek.com/)
 
 ### 安装
 
@@ -38,19 +38,6 @@ git clone https://github.com/Yisan0429/Itranslation.git
 cd Itranslation
 uv sync
 ```
-
-### 配置
-
-在项目根目录创建 `config.json`：
-
-```json
-{
-  "api_key": "sk-你的deepseek-key",
-  "model": "deepseek-v4-pro"
-}
-```
-
-或设置环境变量 `DEEPSEEK_API_KEY`。
 
 ### 启动
 
@@ -221,9 +208,6 @@ CLI 有 checkpoint 机制，重跑自动跳过已翻译的块。GUI 暂不支持
 
 **能用自己的模型吗？**
 模型下拉选「自定义...」→ 点击 ⚙ → 填入 API Base URL + Model Name + Key。支持 Ollama、vLLM、Groq 等任何 OpenAI 兼容接口。
-
-**为什么叫 Itranslation？**
-I = Intelligent / 我。智能翻译，也是"我的翻译"。
 
 ## License
 
