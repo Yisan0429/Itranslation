@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+uv.lock
+
+# IDE
+.vscode/
+.idea/
+
+# Project data (user-specific)
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+final/*
+!final/.gitkeep
+cache/*
+!cache/.gitkeep
+chunks/*
+!chunks/.gitkeep
+vector_store/*
+!vector_store/.gitkeep
+
+# Models (large)
+models/*
+!models/.gitkeep
+
+# Config (contains API keys)
+config.json
+
+# OS
+Thumbs.db
+.DS_Store
