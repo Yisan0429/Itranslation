@@ -67,7 +67,7 @@ uv run python translate_book.py book.pdf --genre literature
 
 ## 功能
 
-### 输入
+### 输入与输出
 
 | 格式 | 引擎 | 精度 | 适用 |
 |------|------|------|------|
@@ -93,12 +93,6 @@ uv run python translate_book.py book.pdf --genre literature
 | DeepSeek V4 Pro | $0.435 / 1M tokens | $0.87 / 1M tokens | 文学翻译，质量最高 |
 | DeepSeek V4 Flash | $0.14 / 1M tokens | $0.28 / 1M tokens | 快速低成本，技术文档够用 |
 | 自定义 | — | — | 任何 OpenAI 兼容 API |
-
-### 输出
-
-- **TXT** — 纯文本，无格式，最小体积
-- **MD** — Markdown，保留标题 `#` 层级和段落结构
-- **PDF** — 排版 PDF，自动嵌入微软雅黑中文字体
 
 ---
 
