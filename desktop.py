@@ -234,7 +234,7 @@ class App:
         Entry(p,textvariable=self.api_key_var,show="•",font=FM,bg=LLGRAY,fg=FG,relief="flat",bd=5).pack(fill="x",pady=(2,0))
 
         Label(p,text="输出格式",font=FB,fg=ACC,bg=BG).pack(anchor="w",pady=(8,0))
-        Combobox(p,textvariable=self.fmt_var,state="readonly",font=FM,values=["txt","md","pdf"],width=18).pack(fill="x",pady=(2,0))
+        Combobox(p,textvariable=self.fmt_var,state="readonly",font=FM,values=["txt","md","pdf","epub"],width=18).pack(fill="x",pady=(2,0))
 
         br=Frame(p,bg=BG);br.pack(fill="x",pady=(14,6))
         self.btn=Button(br,text="开始翻译",command=self._start,font=FB,bg=ACC,fg="#fff",relief="flat",padx=12,pady=5,cursor="hand2")

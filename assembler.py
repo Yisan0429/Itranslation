@@ -109,7 +109,7 @@ def assemble_book(
         bilingual: True = 双语，False = 纯中文
         fmt: "txt" | "md" | "pdf"
     """
-    ext_map = {"txt": ".txt", "md": ".md", "pdf": ".pdf"}
+    ext_map = {"txt": ".txt", "md": ".md", "pdf": ".pdf", "epub": ".epub"}
     path = Path(output_path)
     path = path.with_suffix(ext_map.get(fmt, ".txt"))
 
@@ -117,6 +117,8 @@ def assemble_book(
         _write_pdf(chapter_translations, str(path))
     elif fmt == "md":
         _write_markdown(chapter_translations, str(path), bilingual)
+    elif fmt == "epub":
+        _write_epub(chapter_translations, str(path))
     else:
         _write_txt(chapter_translations, str(path), bilingual)
 
@@ -141,6 +143,50 @@ def _write_markdown(chapters, path, bilingual):
                 if para:
                     f.write(f"{para}\n\n")
             f.write("\n")
+
+
+def _write_epub(chapters, path):
+    """输出 EPUB 电子书。"""
+    try:
+        from ebooklib import epub
+    except ImportError:
+        console.print("[yellow]⚠️ ebooklib 未安装，回退到 TXT[/yellow]")
+        _write_txt(chapters, path.replace(".epub", ".txt"), False)
+        return
+
+    book = epub.EpubBook()
+    book.set_identifier("itranslation")
+    book.set_title(Path(path).stem)
+    book.set_language("zh")
+    book.add_author("Itranslation")
+
+    spine = ["nav"]
+    toc = []
+
+    for i, (title, text) in enumerate(chapters):
+        # 每章一个 xhtml
+        ch = epub.EpubHtml(
+            title=title,
+            file_name=f"chapter_{i:03d}.xhtml",
+            lang="zh",
+        )
+        content = f"<h1>{title}</h1>"
+        for para in text.split("\n"):
+            para = para.strip()
+            if para:
+                content += f"<p>{para}</p>"
+        ch.content = content
+        book.add_item(ch)
+        spine.append(ch)
+        toc.append(epub.Link(f"chapter_{i:03d}.xhtml", title, f"ch{i}"))
+
+    book.toc = tuple(toc)
+    book.spine = spine
+    book.add_item(epub.EpubNcx())
+    book.add_item(epub.EpubNav())
+
+    epub.write_epub(path, book)
+    console.print(f"[green]✅ EPUB 已保存到 {path}[/green]")
 
 
 def _write_pdf(chapters, path):
