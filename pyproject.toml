@@ -1,17 +1,19 @@
 [project]
-name = "book-translation"
-version = "0.1.0"
-description = "Add your description here"
+name = "Itranslation"
+version = "1.0.0"
+description = "AI 全书翻译 — PDF/EPUB/TXT/Markdown → 中文"
 requires-python = ">=3.11"
 dependencies = [
-    "beautifulsoup4>=4.15.0",
-    "chromadb>=1.5.9",
+    "pymupdf>=1.27",
+    "nltk>=3.9",
+    "rich>=13",
+    "tenacity>=9",
+    "fpdf2>=2.8",
     "ebooklib>=0.20",
-    "fpdf2>=2.8.7",
-    "marker-pdf>=1.10.2",
-    "nltk>=3.9.4",
-    "pymupdf>=1.27.2.3",
-    "rich>=15.0.0",
-    "sentence-transformers>=5.5.1",
-    "tenacity>=9.1.4",
+    "beautifulsoup4>=4.15",
 ]
+
+[project.optional-dependencies]
+vision = ["marker-pdf>=1.10"]
+rat = ["chromadb>=1.5", "sentence-transformers>=5.5"]
+full = ["Itranslation[vision,rat]"]

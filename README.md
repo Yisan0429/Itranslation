@@ -39,6 +39,18 @@ cd Itranslation
 uv sync
 ```
 
+> 核心依赖 ~80MB，10 秒装完。
+
+**可选功能：**
+
+```bash
+# marker 视觉 PDF 提取（精度 90%+，需下载 1.4GB 模型）
+uv sync --extra vision
+
+# RAT 向量检索（翻译时参考前文，提升术语一致性）
+uv sync --extra rat
+```
+
 ### 启动
 
 ```bash

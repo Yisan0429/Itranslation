@@ -46,7 +46,10 @@ def _extract_with_marker(pdf_path: Path) -> str:
         from marker.models import create_model_dict
         from marker.converters.pdf import PdfConverter
 
-        console.print("[bold cyan]📄 marker 视觉提取 PDF（加载模型中...）[/bold cyan]")
+        # marker 用 datalab 管理模型缓存，需单独指定路径
+        os.environ.setdefault("DATALAB_DIR", str(cache_dir / "datalab"))
+
+        console.print("[bold cyan]📄 marker 视觉提取 PDF（加载模型...）[/bold cyan]")
         artifacts = create_model_dict()
         converter = PdfConverter(artifact_dict=artifacts)
         rendered = converter(str(pdf_path))
