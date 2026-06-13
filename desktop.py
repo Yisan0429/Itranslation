@@ -466,18 +466,22 @@ class App:
 
             # --- Phase 0: 提取 ---
             if not ckpt or not ckpt.get("chapters"):
-                self._update_ui("Phase 0: 提取..." + (f" ({size_mb:.0f} MB)" if size_mb > max_warn else ""), 0, 1)
+                self._update_ui("Phase 0/4 提取", 0, 1)
+                self._set_status("提取 → 读取文件中...", "#2563eb")
                 md_text = extract_book(path, use_vision=use_marker,
                                        max_mb=max_warn, max_mb_abort=max_abort)
+                self._set_status("提取 → 解析章节结构...", "#2563eb")
                 chapters = parse_structure(md_text)
+                self._set_status(f"提取完成 — {len(md_text):,} 字符, {len(chapters)} 章", "#16a34a")
             else:
                 chapters = ckpt["chapters"]
                 md_text = None
 
             # --- Phase 1: 分块 ---
-            self._update_ui("Phase 1: 分块...", 0, 1)
+            self._update_ui("Phase 1/4 分块", 0, 1)
             all_chapter_data = []
-            for ch in chapters:
+            for i, ch in enumerate(chapters):
+                self._set_status(f"分块 → {ch['title']} ({i+1}/{len(chapters)})", "#2563eb")
                 ct = "\n\n".join(ch.get("paragraphs", []))
                 if ct.strip():
                     cks = chunk_text(ct,
@@ -486,18 +490,34 @@ class App:
                                      overlap_sentences=ov)
                     all_chapter_data.append((ch["title"], cks, ct))
             total = sum(len(c) for _, c, _ in all_chapter_data)
+            self._set_status(f"分块完成 — {len(all_chapter_data)} 章, {total} 块", "#16a34a")
 
             # --- Phase 2: 翻译（并行） ---
             workers = cfg.get("parallel_workers", 4)
-            self._update_ui(f"Phase 2: 翻译中 (并行 {workers} 线程)...", 0, total)
+            mode_str = f"并行 ×{workers}" if (workers > 1 and len(all_chapter_data) > 1) else "串行"
+            self._update_ui(f"Phase 2/4 翻译 ({mode_str})", 0, total)
 
             # 共享状态
             cost_lock = threading.Lock()
             total_cost = {"prompt_tokens": cost_so_far.get("prompt_tokens", 0) if resume_from else 0,
                           "completion_tokens": cost_so_far.get("completion_tokens", 0) if resume_from else 0}
-            done_count = [0]  # list for mutable ref
+            done_count = [0]; chapter_done = [len(resumed_chaps) if resume_from else 0]
             done_lock = threading.Lock()
+            active_chapters = set()  # 正在处理的章节标题
+            active_lock = threading.Lock()
+            total_chapters = len(all_chapter_data)
             failed = []
+
+            def _status_phase2():
+                """生成 Phase 2 状态文字。"""
+                with done_lock:
+                    cd = chapter_done[0]
+                    dc = done_count[0]
+                with active_lock:
+                    active_list = sorted(active_chapters)[:5]
+                    active_str = ", ".join(active_list) if active_list else "—"
+                return (f"翻译 → {cd}/{total_chapters} 章完成 ({dc}/{total} 块)"
+                        f" | 处理中: {active_str}")
 
             def translate_one_chapter(title, cks, ct):
                 """翻译单个章节（在子线程中运行）。"""
@@ -510,14 +530,20 @@ class App:
                         total_cost["completion_tokens"] += prev.get("_ct", 0)
                     with done_lock:
                         done_count[0] += len(cks)
+                        chapter_done[0] += 1
                         self._update_ui(
-                            f"Phase 2: 翻译中 (并行 {workers} 线程)...", done_count[0], total)
+                            f"Phase 2/4 翻译 ({mode_str})", done_count[0], total)
+                        self._set_status(_status_phase2(), "#2563eb")
                     return (title, cks, prev["trans"], ct, prev.get("_pt", 0), prev.get("_ct", 0))
+
+                # 加入活跃列表
+                with active_lock:
+                    active_chapters.add(title)
+                    self._set_status(_status_phase2(), "#2563eb")
 
                 # 每个线程独立的 consistency model
                 cm = ConsistencyModel()
                 def llm(sp, up):
-                    # 检查暂停
                     while self.paused and self.running:
                         time.sleep(0.3)
                     if not self.running:
@@ -533,8 +559,12 @@ class App:
                     total_cost["completion_tokens"] += ct_tok
                 with done_lock:
                     done_count[0] += len(cks)
+                    chapter_done[0] += 1
+                with active_lock:
+                    active_chapters.discard(title)
                     self._update_ui(
-                        f"Phase 2: 翻译中 (并行 {workers} 线程)...", done_count[0], total)
+                        f"Phase 2/4 翻译 ({mode_str})", done_count[0], total)
+                    self._set_status(_status_phase2(), "#2563eb")
                 return (title, cks, trans, ct, pt, ct_tok)
 
             all_trans = []
@@ -595,7 +625,8 @@ class App:
                     f"{t}: {e}" for t, e in failed))
 
             # --- Phase 3: 组装 ---
-            self._update_ui("Phase 3: 组装...", total, total)
+            self._update_ui("Phase 3/4 组装", total, total)
+            self._set_status("组装 → 去重叠合并...", "#2563eb")
             oname = f"{Path(path).stem}_translation"
             odir = self.output_dir.get() or str(PROJECT_ROOT / "final")
             opath = os.path.join(odir, oname)
@@ -603,6 +634,8 @@ class App:
             full = [(t, assemble_translations(c, tr, "first_lock"))
                     for t, c, tr, _, _, _ in all_trans]
             output_fmt = self.fmt_var.get()
+            fmt_names = {"txt": "TXT", "md": "Markdown", "pdf": "PDF", "epub": "EPUB"}
+            self._set_status(f"组装 → 写入 {fmt_names.get(output_fmt, output_fmt)}...", "#2563eb")
             assemble_book(full, opath, fmt=output_fmt)
             # 根据输出格式确定实际文件路径
             ext_map = {"txt": ".txt", "md": ".md", "pdf": ".pdf", "epub": ".epub"}
