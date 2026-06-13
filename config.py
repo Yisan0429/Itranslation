@@ -11,11 +11,10 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 DEFAULT_CONFIG = {
     # === 路径 ===
     "input_dir": str(PROJECT_ROOT / "input"),
-    "output_dir": str(PROJECT_ROOT / "output"),
-    "final_dir": str(PROJECT_ROOT / "final"),
-    "cache_dir": str(PROJECT_ROOT / "cache"),
-    "chunks_dir": str(PROJECT_ROOT / "chunks"),
-    "vector_store_dir": str(PROJECT_ROOT / "vector_store"),
+    "output_dir": str(PROJECT_ROOT / "output"),  # 翻译成品 — 每本书一个子文件夹
+    "reports_dir": str(PROJECT_ROOT / "reports"),  # 报告 (consistency / eval)
+    "cache_dir": str(PROJECT_ROOT / "cache"),  # 断点文件
+    "vector_store_dir": str(PROJECT_ROOT / "vector_store"),  # ChromaDB
 
     # === LLM 配置 ===
     "provider": "deepseek",

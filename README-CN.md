@@ -213,8 +213,10 @@ Itranslation/
 ├── kg_builder.py         Agentic 预读与知识图谱构建
 ├── config.py             全局配置（DEFAULT_CONFIG + config.json）
 ├── env_check.py          可选功能就绪检测器
+├── eval.py               组件评估套件
 ├── input/                源文件目录
-├── final/                成品输出目录
+├── output/               翻译成品（每本书一个子文件夹）
+├── reports/              审计报告（一致性 / 评估）
 ├── cache/                断点文件（JSON）
 └── models/               模型缓存（Marker、sentence-transformers）
 ```

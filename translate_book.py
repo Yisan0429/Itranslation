@@ -239,7 +239,7 @@ def main():
     report = generate_consistency_report(
         issues,
         consistency_model.get_glossary_snapshot(),
-        output_path=str(PROJECT_ROOT / "final" / "consistency_report.txt"),
+        output_path=str(PROJECT_ROOT / "reports" / "consistency" / "consistency_report.txt"),
     )
     console.print(report)
 
@@ -248,15 +248,19 @@ def main():
 
     # 保存最终 glossary
     final_glossary = consistency_model.get_glossary_snapshot()
-    glossary_path = PROJECT_ROOT / "final" / "glossary_final.json"
-    glossary_path.parent.mkdir(exist_ok=True)
+    glossary_path = PROJECT_ROOT / "reports" / "consistency" / "glossary_final.json"
+    glossary_path.parent.mkdir(parents=True, exist_ok=True)
     with open(glossary_path, "w", encoding="utf-8") as f:
         json.dump(final_glossary, f, ensure_ascii=False, indent=2)
 
     # === Phase 4: 组装 ===
     console.print("\n[bold cyan]━━━ Phase 4: 组装 — 去重叠 + 输出 ━━━[/bold cyan]")
 
-    output_path = args.output or str(PROJECT_ROOT / "final" / "translation.txt")
+    if args.output:
+        output_path = args.output
+    else:
+        book_name = book_path.stem
+        output_path = str(PROJECT_ROOT / "output" / book_name / f"{book_name}.txt")
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     full_translations = []

@@ -213,8 +213,10 @@ Itranslation/
 ├── kg_builder.py         Agentic pre-read and knowledge graph construction
 ├── config.py             Configuration management (DEFAULT_CONFIG + config.json)
 ├── env_check.py          Optional feature readiness checker
+├── eval.py               Component evaluation suite
 ├── input/                Source documents
-├── final/                Completed translations
+├── output/               Completed translations (one folder per book)
+├── reports/              Audit reports (consistency / eval)
 ├── cache/                Checkpoint files (JSON)
 └── models/               Model cache (Marker, sentence-transformers)
 ```

@@ -369,7 +369,7 @@ def main():
         print("  ❌ 存在多项问题, 需排查")
 
     # 保存报告
-    report_path = PROJECT_ROOT / "final" / "eval_report.json"
+    report_path = PROJECT_ROOT / "reports" / "eval" / "eval_report.json"
     report_path.parent.mkdir(exist_ok=True)
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump({k: {kk: vv for kk, vv in v.items() if not isinstance(vv, (list, dict))}

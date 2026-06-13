@@ -14,12 +14,10 @@ input/*
 !input/.gitkeep
 output/*
 !output/.gitkeep
-final/*
-!final/.gitkeep
+reports/*
+!reports/.gitkeep
 cache/*
 !cache/.gitkeep
-chunks/*
-!chunks/.gitkeep
 vector_store/*
 !vector_store/.gitkeep
 

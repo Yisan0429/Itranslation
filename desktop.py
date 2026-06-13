@@ -220,7 +220,7 @@ class App:
         self.root.configure(bg=BG)
 
         self.input_path = StringVar()
-        self.output_dir = StringVar(value=str(PROJECT_ROOT/"final"))
+        self.output_dir = StringVar(value=str(PROJECT_ROOT/"output"))
         self.genre_var = StringVar(value="auto")
         self.fmt_var = StringVar(value="txt")
         self.model_var = StringVar(value="DeepSeek V4 Pro")
@@ -687,9 +687,9 @@ class App:
             # --- Phase 3: 组装 ---
             self._update_ui("Phase 3/4 组装", total, total)
             self._set_status("组装 → 去重叠合并...", "#2563eb")
-            oname = f"{Path(path).stem}_translation"
-            odir = self.output_dir.get() or str(PROJECT_ROOT / "final")
-            opath = os.path.join(odir, oname)
+            book_name = Path(path).stem
+            odir = os.path.join(self.output_dir.get() or str(PROJECT_ROOT / "output"), book_name)
+            opath = os.path.join(odir, book_name)
             Path(odir).mkdir(parents=True, exist_ok=True)
             full = [(t, assemble_translations(c, tr, "first_lock"))
                     for t, c, tr, _, _, _ in all_trans]
