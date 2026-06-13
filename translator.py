@@ -39,7 +39,14 @@ def translate_chapter(
     if vector_store is not None:
         vector_store.initialize()
 
+    # 内容哈希 — 文件改动后自动失效
+    import hashlib
+    content_hash = hashlib.md5("".join(c.text for c in chunks).encode()).hexdigest()
+
     checkpoint = _load_checkpoint(checkpoint_path) if checkpoint_path else {}
+    # 内容变了 → 丢弃旧缓存
+    if checkpoint.get("content_hash") != content_hash:
+        checkpoint = {}
     done_ids = set(checkpoint.get("completed_chunks", []))
 
     translations = []
@@ -91,6 +98,7 @@ def translate_chapter(
                 chapter_title,
                 len(translations),
                 len(chunks),
+                content_hash,
             )
 
         # 7. 每 N 块审计
@@ -230,13 +238,14 @@ def _load_checkpoint(path: str) -> dict:
         return {}
 
 
-def _save_checkpoint(path: str, translations: dict, chapter: str, done: int, total: int):
+def _save_checkpoint(path: str, translations: dict, chapter: str, done: int, total: int, content_hash: str = ""):
     data = {
         "chapter": chapter,
         "completed": done,
         "total": total,
         "completed_chunks": list(translations.keys()),
         "translations": translations,
+        "content_hash": content_hash,
         "updated_at": time.time(),
     }
     with open(path, "w", encoding="utf-8") as f:
