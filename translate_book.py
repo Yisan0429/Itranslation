@@ -55,7 +55,7 @@ def main():
     parser.add_argument("--target-tokens", help="每块目标 token 数", type=int, default=1500)
     parser.add_argument("--overlap", help="重叠句子数（覆盖默认值）", type=int, default=None)
     parser.add_argument("--output", help="输出文件路径", default=None)
-    parser.add_argument("--format", help="输出格式 (txt|md|pdf)", default="txt")
+    parser.add_argument("--format", help="输出格式 (txt|md|pdf|epub)", default="txt")
     parser.add_argument("--parallel", help="并行翻译线程数（默认 0=禁用，建议 4）", type=int, default=0)
     parser.add_argument("--clear-cache", help="清空向量存储并重新翻译", action="store_true")
     parser.add_argument("-v", "--verbose", help="详细输出", action="store_true")

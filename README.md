@@ -108,6 +108,7 @@ uv run python translate_book.py book.pdf --genre philosophy --parallel 4 --forma
 - **TXT** — Plain text, minimal file size
 - **MD** — Markdown with heading hierarchy and paragraph structure
 - **PDF** — Typeset PDF with embedded CJK font (auto-detected per platform)
+- **EPUB** — Standard e-book format with chapter navigation
 
 ### Translation Models
 
@@ -250,7 +251,7 @@ Itranslation/
 | RAG-Augmented Translation | ✓ (ChromaDB) | — | — | — | — |
 | Cost Tracking | ✓ ($/¥ real-time) | — | — | — | ✓ |
 | Bilingual Output | — | ✓ | — | — | ✓ |
-| Output Formats | TXT / MD / PDF | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | EPUB |
+| Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | EPUB |
 | Model Support | DeepSeek + custom | 40+ (liteLLM) | Multi-engine | OpenAI family | OpenAI / Claude |
 | Maturity | v1.1 (2026) | 5 years | 3 years | v2 (2025) | v0.1 (2025) |
 

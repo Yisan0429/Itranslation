@@ -108,6 +108,7 @@ uv run python translate_book.py book.pdf --genre philosophy --parallel 4 --forma
 - **TXT** — 纯文本，体积最小
 - **MD** — Markdown，保留标题层级和段落结构
 - **PDF** — 排版输出，自动嵌入平台对应的 CJK 中文字体
+- **EPUB** — 标准电子书格式，含章节目录导航
 
 ### 翻译模型
 
@@ -250,7 +251,7 @@ Itranslation/
 | RAG 增强翻译 | ✓（ChromaDB） | — | — | — | — |
 | 成本追踪 | ✓（$/¥ 实时） | — | — | — | ✓ |
 | 双语输出 | — | ✓ | — | — | ✓ |
-| 输出格式 | TXT / MD / PDF | 双语 EPUB / TXT | 20 种 | EPUB / TXT | EPUB |
+| 输出格式 | TXT / MD / PDF / EPUB | 双语 EPUB / TXT | 20 种 | EPUB / TXT | EPUB |
 | 模型支持 | DeepSeek + 自定义 | 40+（liteLLM） | 多引擎 | OpenAI 系列 | OpenAI / Claude |
 | 成熟度 | v1.1（2026） | 5 年 | 3 年 | v2（2025） | v0.1（2025） |
 
