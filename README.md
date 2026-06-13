@@ -202,20 +202,20 @@ uv run python translate_book.py book.pdf \
 
 ```
 Itranslation/
-├── desktop.py            Desktop GUI (tkinter, high-DPI support)
 ├── translate_book.py     CLI entry point
-├── extractor.py          PDF/EPUB/TXT/MD text extraction
-├── chunker.py            Sentence-level semantic chunking with overlap
-├── translator.py         Translation engine (RAT + terminology injection)
-├── assembler.py          Overlap removal + TXT/MD/PDF output
-├── consistency.py        Incremental terminology consistency model
-├── vector_store.py       ChromaDB vector store for RAT
-├── kg_builder.py         Agentic pre-read and knowledge graph construction
-├── config.py             Configuration management (DEFAULT_CONFIG + config.json)
-├── env_check.py          Optional feature readiness checker
-├── eval.py               Component evaluation suite
+├── src/
+│   ├── extractor.py      PDF/EPUB/TXT/MD text extraction
+│   ├── kg_builder.py     Agentic pre-read and knowledge graph construction
+│   ├── chunker.py        Sentence-level semantic chunking with overlap
+│   ├── translator.py     Translation engine (RAT + terminology injection)
+│   ├── consistency.py    Incremental terminology consistency model
+│   ├── assembler.py      Overlap removal + TXT/MD/PDF/EPUB output
+│   ├── vector_store.py   ChromaDB vector store for RAT
+│   ├── config.py         Configuration (DEFAULT_CONFIG + config.json)
+│   ├── env_check.py      Optional feature readiness checker
+│   └── eval.py           Component evaluation suite
 ├── input/                Source documents
-├── output/               Completed translations (one folder per book)
+├── output/               Translations (one folder per book)
 ├── reports/              Audit reports (consistency / eval)
 ├── cache/                Checkpoint files (JSON)
 └── models/               Model cache (Marker, sentence-transformers)
@@ -285,7 +285,7 @@ Select "自定义..." from the model dropdown, then click the gear icon (⚙) to
 **How do I run the environment checker?**
 
 ```bash
-uv run python env_check.py
+uv run python src/env_check.py
 ```
 
 This reports whether Marker and RAT optional features are fully installed and ready.

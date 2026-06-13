@@ -202,18 +202,18 @@ uv run python translate_book.py book.pdf \
 
 ```
 Itranslation/
-├── desktop.py            桌面 GUI（tkinter，高 DPI 支持）
 ├── translate_book.py     CLI 入口
-├── extractor.py          PDF/EPUB/TXT/MD 文本提取
-├── chunker.py            句子级语义分块与重叠
-├── translator.py         翻译引擎（RAT + 术语注入）
-├── assembler.py          去重叠组装 + TXT/MD/PDF 输出
-├── consistency.py        增量术语一致性模型与审计报告
-├── vector_store.py       ChromaDB 向量存储
-├── kg_builder.py         Agentic 预读与知识图谱构建
-├── config.py             全局配置（DEFAULT_CONFIG + config.json）
-├── env_check.py          可选功能就绪检测器
-├── eval.py               组件评估套件
+├── src/
+│   ├── extractor.py      PDF/EPUB/TXT/MD 文本提取
+│   ├── kg_builder.py     Agentic 预读与知识图谱构建
+│   ├── chunker.py        句子级语义分块与重叠
+│   ├── translator.py     翻译引擎（RAT + 术语注入）
+│   ├── consistency.py    增量术语一致性模型与审计报告
+│   ├── assembler.py      去重叠组装 + TXT/MD/PDF/EPUB 输出
+│   ├── vector_store.py   ChromaDB 向量存储
+│   ├── config.py         全局配置（DEFAULT_CONFIG + config.json）
+│   ├── env_check.py      可选功能就绪检测器
+│   └── eval.py           组件评估套件
 ├── input/                源文件目录
 ├── output/               翻译成品（每本书一个子文件夹）
 ├── reports/              审计报告（一致性 / 评估）
@@ -285,7 +285,7 @@ GUI 与 CLI 均在每章完成后保存进度。中断后重新翻译同一文�
 **如何检测可选功能是否就绪？**
 
 ```bash
-uv run python env_check.py
+uv run python src/env_check.py
 ```
 
 该脚本会检测 Marker 和 RAT 可选功能是否完整安装并可用。
