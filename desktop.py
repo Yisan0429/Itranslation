@@ -196,6 +196,8 @@ class App:
         self.extract_var = StringVar(value="fitz (文本, 快速)")
         self.preread_var = BooleanVar(value=False)
         self.rat_var = BooleanVar(value=False)
+        self._status_text = "● 就绪"
+        self._status_color = "#8a8a8a"
         self.running = False; self.paused = False
         self._pause_event = __import__("threading").Event(); self._pause_event.set()
         self._start_time = 0.0
@@ -286,10 +288,8 @@ class App:
         self.status_lbl.pack(fill="both", expand=True)
 
     def _set_status(self, text, color="#8a8a8a"):
-        if threading.current_thread() is threading.main_thread():
-            self.status_lbl.configure(text=text, fg=color)
-        else:
-            self.root.after(0, lambda: self.status_lbl.configure(text=text, fg=color))
+        self._status_text = text
+        self._status_color = color
 
     def _custom_model(self):
         dlg=Toplevel(self.root); dlg.title("自定义模型"); dlg.geometry("420x280"); dlg.configure(bg=BG)
@@ -350,6 +350,8 @@ class App:
             eta_str = f"{int(eta//60)}:{int(eta%60):02d}"
             text += f"  |  剩余 ~{eta_str}"
         self.time_lbl.configure(text=text)
+        # 同步状态栏（从共享变量读取，线程安全）
+        self.status_lbl.configure(text=self._status_text, fg=self._status_color)
         self._timer_id = self.root.after(1000, self._update_timer)
 
     def _start_timer(self):
@@ -363,8 +365,8 @@ class App:
     def _toggle_pause(self):
         if not self.running: return
         self.paused=not self.paused
-        if self.paused: self._pause_event.clear(); self.pause_btn.configure(text="▶"); self.phase_lbl.configure(text="⏸ 已暂停 — 点击 ▶ 继续"); self._set_status("⏸ 已暂停", "#d97706")
-        else: self._pause_event.set(); self.pause_btn.configure(text="⏸"); self.phase_lbl.configure(text="翻译中..."); self._set_status("● 翻译中...", "#111")
+        if self.paused: self._pause_event.clear(); self.pause_btn.configure(text="▶"); self.phase_lbl.configure(text="⏸ 已暂停 — 点击 ▶ 继续"); self._set_status("⏸ 已暂停", "#d97706"); self.status_lbl.configure(text=self._status_text, fg=self._status_color)
+        else: self._pause_event.set(); self.pause_btn.configure(text="⏸"); self.phase_lbl.configure(text="翻译中..."); self._set_status("● 翻译中...", "#111"); self.status_lbl.configure(text=self._status_text, fg=self._status_color)
     def _abort(self):
         if not self.running: return
         self.running = False
@@ -374,6 +376,7 @@ class App:
         self.abort_btn.configure(state=DISABLED)
         self.phase_lbl.configure(text="已放弃")
         self._set_status("✗ 已放弃", "#dc2626")
+        self.status_lbl.configure(text=self._status_text, fg=self._status_color)
     def _start(self):
         if self.running: return
         path=self.input_path.get()
@@ -397,6 +400,7 @@ class App:
         self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸");self.abort_btn.configure(state=NORMAL)
         self.open_btn.pack_forget();self.result_lbl.configure(text="");self._set(self.ov,"")
         self._set_status("● 翻译中...", "#111")
+        self.status_lbl.configure(text=self._status_text, fg=self._status_color)
         self._start_timer()
         threading.Thread(target=self._run,args=(gui_state,),daemon=True).start()
 
@@ -730,6 +734,7 @@ class App:
         self.abort_btn.configure(state=DISABLED)
         self.phase_lbl.configure(text="翻译完成")
         self._set_status("✓ 翻译完成", "#16a34a")
+        self.status_lbl.configure(text=self._status_text, fg=self._status_color)
         self.result_lbl.configure(text=f"{n}\n{cost_str}\n用时 {dur}")
         self.open_btn.pack(pady=(4, 0))
 
@@ -739,6 +744,7 @@ class App:
         self.pause_btn.configure(state=DISABLED,text="⏸");self.abort_btn.configure(state=DISABLED)
         self.phase_lbl.configure(text=f"失败: {msg}")
         self._set_status(f"✗ {msg}", "#dc2626")
+        self.status_lbl.configure(text=self._status_text, fg=self._status_color)
     def _open(self):
         if self.output_file and Path(self.output_file).exists(): os.startfile(self.output_file)
 
