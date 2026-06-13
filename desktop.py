@@ -570,12 +570,20 @@ class App:
 
                 # 每个线程独立的 consistency model
                 cm = ConsistencyModel()
+                chunk_total = len(cks)
+                chunk_done = [0]
                 def llm(sp, up):
                     while self.paused and self.running:
                         time.sleep(0.3)
                     if not self.running:
                         raise RuntimeError("翻译已取消")
-                    return call_api(cfg, sp, up, max_tokens=cfg.get("max_tokens_per_chunk", 8192))
+                    chunk_done[0] += 1
+                    self._set_status(
+                        f"翻译 → {title} ({chunk_done[0]}/{chunk_total} 块) — API 调用中...", "#2563eb")
+                    try:
+                        return call_api(cfg, sp, up, max_tokens=cfg.get("max_tokens_per_chunk", 8192))
+                    finally:
+                        self._set_status(_status_phase2(), "#2563eb")
 
                 trans = translate_chapter(title, cks, vector_store, cm, glossary, kg, llm, cfg)
                 pt = cfg.get("_cost", {}).get("prompt_tokens", 0)
