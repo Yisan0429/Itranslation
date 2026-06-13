@@ -286,7 +286,10 @@ class App:
         self.status_lbl.pack(fill="both", expand=True)
 
     def _set_status(self, text, color="#8a8a8a"):
-        self.root.after(0, lambda: self.status_lbl.configure(text=text, fg=color))
+        if threading.current_thread() is threading.main_thread():
+            self.status_lbl.configure(text=text, fg=color)
+        else:
+            self.root.after(0, lambda: self.status_lbl.configure(text=text, fg=color))
 
     def _custom_model(self):
         dlg=Toplevel(self.root); dlg.title("自定义模型"); dlg.geometry("420x280"); dlg.configure(bg=BG)
@@ -597,6 +600,8 @@ class App:
             # 过滤已完成的章节
             pending = [(t, c, ct) for t, c, ct in all_chapter_data
                        if t not in (resumed_chaps if resume_from else set())]
+
+            self._set_status(f"翻译 → 准备翻译 {len(pending)} 章...", "#2563eb")
 
             if workers <= 1 or len(pending) <= 1:
                 # 串行模式
