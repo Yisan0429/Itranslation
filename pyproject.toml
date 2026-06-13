@@ -1,6 +1,6 @@
 [project]
 name = "Itranslation"
-version = "1.1.1"
+version = "1.1.2"
 description = "AI 全书翻译 — PDF/EPUB/TXT/Markdown → 中文"
 requires-python = ">=3.11"
 dependencies = [
