@@ -1,37 +1,50 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
+  <img src="https://img.shields.io/badge/version-1.1.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
+  <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
 
 <h1 align="center">Itranslation</h1>
-<p align="center"><strong>AI 全书翻译 · 一行命令翻完一本书</strong></p>
-<p align="center">PDF / EPUB / TXT / Markdown → 中文 · 桌面 GUI + 命令行 · 暂停恢复 · 术语一致性审计 · 实时成本</p>
+<p align="center"><strong>AI-Powered Book Translation · Desktop GUI & CLI</strong></p>
+<p align="center">
+  PDF · EPUB · TXT · Markdown → Chinese<br>
+  Sentence-Level Chunking · Consistency Audit · Pause/Resume · Cost Tracking
+</p>
 
 ---
 
-## 为什么选 Itranslation
+## Overview
 
-大多数翻译工具能做到"把文字从 A 语言变成 B 语言"。但这不够——翻开一本 300 页的书，你需要的是：
+Itranslation is a desktop application and command-line tool for translating entire books using large language models. It accepts PDF, EPUB, TXT, and Markdown files, processes them through a multi-phase pipeline with sentence-level chunking, terminology consistency auditing, and retrieval-augmented translation (RAT), then outputs clean Chinese text in TXT, Markdown, or PDF format.
 
-| 你需要 | 别人的做法 | Itranslation |
-|--------|-----------|-------------|
-| 不切碎句子 | 每 10 行一刀切 | 句子级分词 + 重叠冗余 |
-| 术语不前后矛盾 | 靠 LLM 自觉 | 实时追踪 200+ 术语，<80% 自动报警 |
-| 翻到一半想停 | 只能等它跑完 | 随时 ⏸ 暂停，随时 ▶ 继续 |
-| 知道花了多少钱 | 不知道 | 每块翻完立刻显示 $/¥ |
-| 换模型 | 写死在代码里 | 下拉框切换，自定义 ⚙ 填 URL |
+Unlike tools that split text at arbitrary line boundaries, Itranslation tokenizes at the sentence level and employs overlapping chunks with a first-lock deduplication strategy — ensuring that no sentence is ever broken mid-thought.
 
-## 快速开始
+---
 
-### 前提
+## Key Differentiators
 
-- **Python 3.11+** — [下载](https://www.python.org/downloads/)
-- **uv** 包管理器 — `pip install uv`
-- **DeepSeek API Key** — [免费注册](https://platform.deepseek.com/)
+| Capability | Typical Approach | Itranslation |
+|---|---|---|
+| Chunking | Fixed line count (e.g., every 10 lines) | Sentence-level tokenization with configurable overlap |
+| Terminology Consistency | Relies on LLM memory across calls | Incremental tracking model with automated drift detection |
+| Translation Quality | Single-pass, no validation | Overlap redundancy + real-time audit at configurable intervals |
+| Interruption Handling | Restart from beginning | Pause/Resume in GUI; checkpoint-based resume in CLI and GUI |
+| Cost Visibility | Unknown until billing | Per-chunk token consumption and cost displayed in real time ($/¥) |
+| Model Flexibility | Hardcoded provider | Preset models (DeepSeek V4 Pro/Flash) + custom OpenAI-compatible API configuration |
 
-### 安装
+---
+
+## Installation
+
+### Prerequisites
+
+- **Python 3.11** or later — [python.org](https://www.python.org/downloads/)
+- **uv** package manager — `pip install uv`
+- **DeepSeek API Key** — [platform.deepseek.com](https://platform.deepseek.com/) (free registration)
+
+### Setup
 
 ```bash
 git clone https://github.com/Yisan0429/Itranslation.git
@@ -39,211 +52,239 @@ cd Itranslation
 uv sync
 ```
 
-> 核心依赖 ~80MB，10 秒装完。
+Core dependencies total approximately 80 MB and install in under 10 seconds.
 
-**可选功能：**
+### Optional Features
 
 ```bash
-# marker 视觉 PDF 提取（精度 90%+，需下载 1.4GB 模型）
+# Marker-based visual PDF extraction (90%+ accuracy for complex layouts; ~1.4 GB model download)
 uv sync --extra vision
 
-# RAT 向量检索（翻译时参考前文，提升术语一致性）
+# Retrieval-Augmented Translation (ChromaDB + sentence-transformers; ~300 MB)
 uv sync --extra rat
 ```
 
-### 启动
+### Launch
 
 ```bash
-# 桌面 GUI（推荐）
+# Desktop GUI
 uv run python desktop.py
 
-# 命令行
-uv run python translate_book.py book.pdf --genre literature
+# Command line
+uv run python translate_book.py book.pdf --genre literature --format pdf
 ```
 
-> Windows 用户：运行 `book-translation.vbs` 可直接启动 GUI，无终端窗口。
+On Windows, `book-translation.vbs` provides a silent GUI launcher (no terminal window).
 
 ---
 
-## 功能
+## Features
 
-### 输入与输出
+### Input Formats
 
-| 格式 | 引擎 | 精度 | 适用 |
-|------|------|------|------|
-| **PDF** | PyMuPDF 文本层 | 60-70% | 普通排版 PDF |
-| **PDF** | marker 视觉 | 90%+ | 复杂排版、双栏、表格 |
-| **EPUB** | ebooklib | ~99% | 电子书 |
-| **TXT / MD** | 直接读取 | 100% | 纯文本 |
+| Format | Extraction Engine | Accuracy | Notes |
+|---|---|---|---|
+| **PDF** | PyMuPDF (default) | 60–70% | Suitable for standard single-column layouts |
+| **PDF** | Marker (optional) | 90%+ | Multi-column, tables, complex formatting; requires model download |
+| **EPUB** | ebooklib | ~99% | Preserves chapter structure |
+| **TXT / MD** | Direct read | 100% | No extraction overhead |
 
-### 体裁
+### Genre-Aware Translation
 
-| 体裁 | 翻译策略 | 典型场景 |
-|------|---------|---------|
-| **文学** | 保留修辞、韵律、情感色彩，优雅现代汉语 | 小说、散文、诗歌 |
-| **哲学** | 直译保真，长句不拆分，术语统一 | 康德、海德格尔 |
-| **自然科学** | 术语精确优先，数据/公式/单位不变 | 论文、教科书 |
-| **社会科学** | 直译兼可读，引文格式保留 | 历史、社会学 |
-| **技术** | 代码/命令/配置原样保留 | 技术文档 |
+| Genre | Strategy | Use Cases |
+|---|---|---|
+| Literature | Preserve rhetoric, rhythm, and emotional tone; elegant modern Chinese | Novels, poetry, essays |
+| Philosophy | Faithful direct translation; maintain logical structure; consistent terminology | Academic philosophy, treatises |
+| Natural Science | Terminology accuracy prioritized; data, formulas, and units preserved verbatim | Textbooks, research papers |
+| Social Science | Balanced direct translation with readability; citation format preserved | History, sociology, economics |
+| Technical | Code, commands, and configuration values left unchanged | Documentation, manuals |
 
-### 翻译模型
+### Output Formats
 
-| 模型 | 输入价格 | 输出价格 | 适用 |
-|------|---------|---------|------|
-| DeepSeek V4 Pro | $0.435 / 1M tokens | $0.87 / 1M tokens | 文学翻译，质量最高 |
-| DeepSeek V4 Flash | $0.14 / 1M tokens | $0.28 / 1M tokens | 快速低成本，技术文档够用 |
-| 自定义 | — | — | 任何 OpenAI 兼容 API |
+- **TXT** — Plain text, minimal file size
+- **MD** — Markdown with heading hierarchy and paragraph structure
+- **PDF** — Typeset PDF with embedded CJK font (auto-detected per platform)
+
+### Translation Models
+
+| Model | Input Price | Output Price | Best For |
+|---|---|---|---|
+| DeepSeek V4 Pro | $0.435 / 1M tokens | $0.87 / 1M tokens | Highest translation quality |
+| DeepSeek V4 Flash | $0.14 / 1M tokens | $0.28 / 1M tokens | High-speed, cost-sensitive tasks |
+| Custom | — | — | Any OpenAI-compatible API (Ollama, vLLM, Groq, etc.) |
+
+### Parallel Translation (v1.1)
+
+Chapters are translated concurrently using a configurable thread pool. Default parallelism is 4 workers; disable by setting `parallel_workers: 0` in config or passing `--parallel 0` on the CLI.
+
+### Checkpoint & Resume (v1.1)
+
+Both GUI and CLI persist translation progress after each chapter. If a translation is interrupted — by network failure, application crash, or user cancellation — restarting on the same file presents a resume prompt with completed chapter list.
 
 ---
 
-## 架构
+## Architecture
 
 ```
-输入 (PDF/EPUB/TXT/MD)
+Input (PDF / EPUB / TXT / MD)
   │
-  ├─ Phase 0: 提取 + 体裁检测
-  │   └─ PyMuPDF / marker → 清洗 → 自动识别文学/哲学/科学
+  ├─ Phase 0: Extraction & Pre-Read
+  │   └─ PyMuPDF or Marker → text cleaning → optional Knowledge Graph construction
   │
-  ├─ Phase 1: 语义分块 + 重叠
-  │   └─ 句子级分词 → 贪心打包 → 重叠 3-4 句（冗余纠错）
+  ├─ Phase 1: Semantic Chunking
+  │   └─ Sentence tokenization → greedy packing → overlap (3–4 sentences)
   │
-  ├─ Phase 2: 翻译
-  │   └─ 每块: 术语注入 + 重叠上下文 → LLM → 向量存储
+  ├─ Phase 2: Translation (Parallel)
+  │   └─ Per-chunk: terminology injection + context → LLM API → vector store
   │
-  ├─ Phase 3: 质量审计
-  │   └─ 术语一致性模型：每 20 块审计，<80% 报警
+  ├─ Phase 3: Quality Audit
+  │   └─ Consistency model: audit every N chunks; alert if term consistency < 80%
   │
-  └─ Phase 4: 组装
-      └─ 去重叠（首次锁定策略）→ TXT / MD / PDF
+  └─ Phase 4: Assembly
+      └─ Overlap removal (first-lock strategy) → TXT / MD / PDF output
 ```
 
-### 关键设计
+### Core Design Decisions
 
-**语义分块：** 不是机械地每 N 行一刀，而是先把文本拆成句子，再贪心打包。块之间有 3-4 句重叠——同一句话在两个块里各有一份翻译，组装时取首次出现的版本。
+**Sentence-Level Chunking.** Input text is split into sentences, then greedily packed into chunks of configurable token size. Adjacent chunks overlap by 3–4 sentences. During assembly, the first occurrence of each sentence is retained and subsequent duplicates are discarded. This provides redundant translation coverage at approximately 5% token overhead.
 
-**术语一致性：** 每翻译一个术语就记录：哪个词 → 译成了什么 → 在第几段。每 20 块自动审计全部术语，发现同一个词有两种不同译法就报警。
+**Incremental Consistency Model.** Each term translation is recorded with its source location. After every 20 chunks (configurable), the model audits all tracked terms. Any term whose dominant translation falls below the 80% consistency threshold triggers an alert, identifying both the drift and the suggested canonical translation.
 
----
-
-## 成本
-
-基于 DeepSeek V4 Pro 官方定价和实测数据：
-
-| 书的规模 | 字数 | tokens | 耗时 | 费用 |
-|---------|------|--------|------|------|
-| 短篇 | 3,000 | ~5K in / 5K out | ~10 秒 | $0.01 (~¥0.07) |
-| 中篇 | 30,000 | ~50K in / 50K out | ~2 分钟 | $0.07 (~¥0.50) |
-| 长篇 | 100,000 | ~150K in / 140K out | ~7 分钟 | $0.20 (~¥1.44) |
-| 巨著 | 300,000 | ~450K in / 420K out | ~20 分钟 | $0.60 (~¥4.32) |
-
-> 实测：1196 词文学作品 → 2 块 → **$0.0076 (~¥0.06)** → 用时 10 秒。
+**Retrieval-Augmented Translation.** Previously translated passages are stored in a ChromaDB vector store using `all-MiniLM-L6-v2` embeddings. When translating a new chunk, the system retrieves the most semantically similar prior translations and injects them as reference context into the LLM prompt.
 
 ---
 
-## 命令行
+## Estimated Cost
+
+Based on DeepSeek V4 Pro pricing and measured throughput:
+
+| Book Size | Word Count | Est. Tokens | Est. Duration | Est. Cost |
+|---|---|---|---|---|
+| Short story | 3,000 | ~5K in / 5K out | ~10 sec | ~$0.01 (¥0.07) |
+| Novella | 30,000 | ~50K in / 50K out | ~2 min | ~$0.07 (¥0.50) |
+| Novel | 100,000 | ~150K in / 140K out | ~7 min | ~$0.20 (¥1.44) |
+| Epic | 300,000 | ~450K in / 420K out | ~20 min | ~$0.60 (¥4.32) |
+
+Measured: 1,196-word literary excerpt → 2 chunks → $0.0076 (¥0.06) in 10 seconds.
+
+Cost calculation is automatic for DeepSeek models. Custom models display token counts without a monetary estimate to prevent misleading figures.
+
+---
+
+## CLI Reference
 
 ```bash
-# 基础
+# Basic usage
 uv run python translate_book.py book.pdf
 
-# 指定体裁 + PDF 输出
+# Genre + output format
 uv run python translate_book.py book.pdf --genre philosophy --format pdf
 
-# 快速模式（跳过预读和 RAT）
+# Fast mode (skip pre-read and RAT)
 uv run python translate_book.py book.pdf --no-preread --no-rat
 
-# 完整参数
+# Parallel translation with custom output
 uv run python translate_book.py book.pdf \
   --genre literature \
   --format md \
   --model deepseek-v4-flash \
-  --target-tokens 1500 \
-  --overlap 3 \
-  --output final/result
+  --parallel 4 \
+  --output final/translation
 ```
 
 ---
 
-## 项目结构
+## Project Structure
 
 ```
 Itranslation/
-├── desktop.py          桌面 GUI（双击启动）
-├── translate_book.py   CLI 入口
-├── extractor.py        PDF/EPUB/TXT/MD 提取
-├── chunker.py          句子级语义分块 + 层叠重叠
-├── translator.py       RAT 翻译引擎（术语注入 + 上下文）
-├── assembler.py        去重叠组装 + TXT/MD/PDF 输出
-├── consistency.py      增量术语一致性模型 + 审计报告
-├── vector_store.py     ChromaDB 向量存储
-├── kg_builder.py       Agentic 预读 + 知识图谱构建
-├── config.py           全局配置管理
-├── input/              原始书籍文件
-├── output/             逐块中间译文
-├── final/              最终输出文件
-├── cache/              JSON 断点文件
-└── models/             marker 视觉模型缓存
+├── desktop.py            Desktop GUI (tkinter, high-DPI support)
+├── translate_book.py     CLI entry point
+├── extractor.py          PDF/EPUB/TXT/MD text extraction
+├── chunker.py            Sentence-level semantic chunking with overlap
+├── translator.py         Translation engine (RAT + terminology injection)
+├── assembler.py          Overlap removal + TXT/MD/PDF output
+├── consistency.py        Incremental terminology consistency model
+├── vector_store.py       ChromaDB vector store for RAT
+├── kg_builder.py         Agentic pre-read and knowledge graph construction
+├── config.py             Configuration management (DEFAULT_CONFIG + config.json)
+├── env_check.py          Optional feature readiness checker
+├── input/                Source documents
+├── final/                Completed translations
+├── cache/                Checkpoint files (JSON)
+└── models/               Model cache (Marker, sentence-transformers)
 ```
 
 ---
 
-## 与同类项目对比
+## Comparison with Related Work
 
-### Top 5 开源竞品（按 GitHub 星标排序）
+### Top 5 Open-Source Projects (by GitHub stars)
 
-| # | 项目 | ⭐ Stars | 定位 | 核心优势 | 主要局限 |
-|---|------|---------|------|---------|---------|
-| 1 | [Immersive Translate](https://github.com/immersive-translate/immersive-translate) | 17.8k | 浏览器扩展 + 网页/PDF/EPUB 翻译 | 全平台覆盖、100+ 语言、实时双语 | 需装扩展、非独立翻译工具、Pro 收费 |
-| 2 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI 电子书翻译 | 生态成熟（5年）、双语输出、40+ 模型 | 无 GUI、硬切分块、无术语审计 |
-| 3 | [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | 2.5k | Calibre 插件 | 48 种格式输入、20 种输出、多引擎 | 依赖 Calibre、学习成本高 |
-| 4 | [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 1.7k | 通用电子书翻译 | 多格式、v2 架构现代化、SQLite 缓存 | 仅 CLI、无翻译质量审计 |
-| 5 | [epub-translator](https://github.com/oomol-lab/epub-translator) | 771 | EPUB 双语翻译库 | 100% 保格式、API 接口齐全 | 仅 EPUB、生态较新 |
+| # | Project | Stars | Scope | Strengths | Limitations |
+|---|---------|-------|-------|-----------|-------------|
+| 1 | [Immersive Translate](https://github.com/immersive-translate/immersive-translate) | 17.8k | Browser extension (web, PDF, EPUB) | Broad platform coverage; 100+ languages; real-time bilingual display | Requires browser extension; not a standalone translation tool; Pro tier is paid |
+| 2 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI ebook translator | Mature ecosystem (5 years); bilingual output; 40+ models via liteLLM | No GUI; fixed-line chunking; no terminology auditing |
+| 3 | [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | 2.5k | Calibre plugin | 48 input formats; 20 output formats; multiple translation engines | Requires Calibre; higher learning curve |
+| 4 | [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 1.7k | CLI ebook translator | Multi-format; modern v2 architecture; SQLite resume cache | CLI only; no translation quality auditing |
+| 5 | [epub-translator](https://github.com/oomol-lab/epub-translator) | 771 | EPUB bilingual translation library | Preserves original formatting; clean API | EPUB only; early-stage ecosystem |
 
-### Itranslation vs 全维度对比
+### Feature Comparison
 
-| 维度 | Itranslation v1.1 | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | epub-translator |
-|------|:---:|:---:|:---:|:---:|:---:|
-| **桌面 GUI** | ✅ tkinter | ❌ | ✅ 集成 | ❌ | ❌ |
-| **断点续传** | ✅ GUI+CLI | ✅ .bin | ✅ hash | ✅ SQLite | ❌ |
-| **并行翻译** | ✅ 章节级 | ✅ API batch | ✅ 多书 | ❌ 串行 | ✅ 并发 |
-| **句子级分块** | ✅ 不切断 | ❌ 10 行硬切 | ❌ 段落级 | ❌ token 切 | ✅ 段落级 |
-| **重叠冗余** | ✅ 3-4 句 | ❌ | ❌ | ❌ | ❌ |
-| **术语一致性** | ✅ 实时审计 | ⚠️ 滑动窗口 | ❌ | ❌ | ❌ |
-| **体裁适配** | ✅ 5 种 | ⚠️ prompt 可调 | ❌ | ⚠️ 上下文文件 | ❌ |
-| **知识图谱预读** | ✅ Agentic KG | ❌ | ❌ | ❌ | ❌ |
-| **RAT 检索增强** | ✅ ChromaDB | ❌ | ❌ | ❌ | ❌ |
-| **成本显示** | ✅ $/¥ 实时 | ❌ | ❌ | ❌ | ✅ token 统计 |
-| **双语输出** | ❌ | ✅ | ❌ | ❌ | ✅ 核心卖点 |
-| **输出格式** | TXT/MD/PDF | 双语 EPUB/TXT | 20 种 | EPUB/TXT | EPUB |
-| **模型支持** | DeepSeek+自定义 | 40+ (liteLLM) | 多引擎 | OpenAI 系 | OpenAI/Claude |
-| **成熟度** | v1.1 (2026) | 5 年 | 3 年 | v2 (2025) | v0.1 (2025) |
+| Dimension | Itranslation v1.1 | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | epub-translator |
+|---|---:|---:|---:|---:|---:|---:|
+| Desktop GUI | ✓ | — | ✓ (via Calibre) | — | — |
+| Checkpoint/Resume | ✓ (GUI + CLI) | ✓ | ✓ | ✓ | — |
+| Parallel Translation | ✓ (chapter-level) | ✓ (API batch) | ✓ (multi-book) | — | ✓ |
+| Sentence-Level Chunking | ✓ | — | — | — | — |
+| Overlap Redundancy | ✓ | — | — | — | — |
+| Terminology Consistency | ✓ (real-time audit) | Partial | — | — | — |
+| Genre Adaptation | ✓ (5 presets) | Partial | — | Partial | — |
+| Knowledge Graph Pre-Read | ✓ | — | — | — | — |
+| RAG-Augmented Translation | ✓ (ChromaDB) | — | — | — | — |
+| Cost Tracking | ✓ ($/¥ real-time) | — | — | — | ✓ |
+| Bilingual Output | — | ✓ | — | — | ✓ |
+| Output Formats | TXT / MD / PDF | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | EPUB |
+| Model Support | DeepSeek + custom | 40+ (liteLLM) | Multi-engine | OpenAI family | OpenAI / Claude |
+| Maturity | v1.1 (2026) | 5 years | 3 years | v2 (2025) | v0.1 (2025) |
 
-### 核心差异化
+### Unique Advantages
 
-Itranslation 的三个独有优势：
+1. **Translation Quality Pipeline.** Sentence-level chunking, overlap redundancy, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project.
+2. **Desktop GUI.** The only standalone tool in this comparison that offers both a native desktop interface and a CLI — suitable for non-technical users without requiring additional software such as Calibre.
+3. **Cost Transparency.** Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
 
-1. **翻译质量导向** — 句子级分块不切断 + 重叠冗余 + 术语一致性实时审计，形成"翻译→验证→纠偏"闭环。同类项目中没有任何一个同时具备这三项。
-2. **桌面 GUI 零门槛** — 选文件→点按钮→出结果。是唯一同时提供桌面 GUI 和 CLI 的独立翻译工具（Calibre 插件需要先装 Calibre）。
-3. **成本透明** — 实时显示每条 API 调用的 token 消耗和费用（$ 和 ¥ 双币种），自定义模型明确标注"费用未知"不误导。
+### Known Gaps
 
-三个明确短板（正在补）：
-
-1. **无双语输出** — bilingual_book_maker 和 epub-translator 的核心卖点
-2. **生态太新** — v1.1 vs 竞品数年的迭代和社区
-3. **输入格式有限** — PDF/EPUB/TXT/MD vs Calibre 插件的 48 种
+1. **No bilingual output.** Both bilingual_book_maker and epub-translator produce side-by-side bilingual editions — a frequently requested feature not yet available.
+2. **Early-stage ecosystem.** v1.1 versus competitors with years of community-driven iteration and bug fixes.
+3. **Limited input format coverage.** Four formats (PDF, EPUB, TXT, MD) versus Calibre Plugin's 48.
 
 ---
 
-## 常见问题
+## FAQ
 
-**翻一半网络断了怎么办？**
-CLI 和 GUI 都支持 checkpoint 断点续传。中断后重新翻译同一文件，自动检测进度并询问是否从断点继续。
+**What happens if the network drops mid-translation?**
 
-**扫描版 PDF 能翻吗？**
-需要 marker 视觉提取（选 PDF 提取方式为 "marker"）。首次使用会下载约 2GB 模型。
+Both the GUI and CLI persist translation progress after every chapter. Re-running on the same file detects the existing checkpoint and offers to resume from the interruption point.
 
-**能用自己的模型吗？**
-模型下拉选「自定义...」→ 点击 ⚙ → 填入 API Base URL + Model Name + Key。支持 Ollama、vLLM、Groq 等任何 OpenAI 兼容接口。
+**Can scanned/image-based PDFs be translated?**
+
+Yes, using the Marker visual extraction engine. Select "marker (视觉, 90%+ 精度)" as the PDF extraction method. Model files (~2 GB) are downloaded automatically on first use.
+
+**Can I use my own LLM provider?**
+
+Select "自定义..." from the model dropdown, then click the gear icon (⚙) to configure the API base URL, model name, and API key. Any OpenAI-compatible endpoint is supported (Ollama, vLLM, Groq, etc.).
+
+**How do I run the environment checker?**
+
+```bash
+uv run python env_check.py
+```
+
+This reports whether Marker and RAT optional features are fully installed and ready.
+
+---
 
 ## License
 
