@@ -6,6 +6,10 @@
   <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
 
+<p align="center">
+  <a href="README.md">English</a> · <a href="README-CN.md">简体中文</a>
+</p>
+
 <h1 align="center">Itranslation</h1>
 <p align="center"><strong>AI-Powered Book Translation · Desktop GUI & CLI</strong></p>
 <p align="center">
