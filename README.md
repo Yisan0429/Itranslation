@@ -239,7 +239,7 @@ Itranslation/
 
 | Dimension | Itranslation v1.1 | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | epub-translator |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| Desktop GUI | ✓ | — | ✓ (via Calibre) | — | — |
+| Desktop GUI | — | — | ✓ (via Calibre) | — | — |
 | Checkpoint/Resume | ✓ (GUI + CLI) | ✓ | ✓ | ✓ | — |
 | Parallel Translation | ✓ (chapter-level) | ✓ (API batch) | ✓ (multi-book) | — | ✓ |
 | Sentence-Level Chunking | ✓ | — | — | — | — |
