@@ -28,6 +28,10 @@ models/*
 # Config (contains API keys)
 config.json
 
+# Generated files
+knowledge_graph.json
+consistency_model.json
+
 # OS
 Thumbs.db
 .DS_Store
