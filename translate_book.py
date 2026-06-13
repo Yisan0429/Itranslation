@@ -114,7 +114,7 @@ def main():
         glossary = kg_to_glossary(kg)
 
         # 保存 KG
-        kg_path = PROJECT_ROOT / "knowledge_graph.json"
+        kg_path = PROJECT_ROOT / "reports" / "knowledge_graph.json"
         with open(kg_path, "w", encoding="utf-8") as f:
             json.dump(kg, f, ensure_ascii=False, indent=2)
         console.print(f"  KG 已保存到 {kg_path}")
@@ -244,7 +244,7 @@ def main():
     console.print(report)
 
     # 保存一致性模型
-    consistency_model.save(str(PROJECT_ROOT / "consistency_model.json"))
+    consistency_model.save(str(PROJECT_ROOT / "reports" / "consistency_model.json"))
 
     # 保存最终 glossary
     final_glossary = consistency_model.get_glossary_snapshot()
