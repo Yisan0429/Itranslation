@@ -13,10 +13,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ═══════════════════════════════════════════════════════════
 
 def _check_env():
-    """检查运行环境，缺失时给出明确修复指令。"""
+    """快速环境检测 — 仅检查必需项 (Python版本 + config.json)。依赖检查和 subprocess 跳过以加速启动。"""
+    import importlib.util
+
     errors = []
 
-    # 1. 检查 Python 版本
+    # 1. Python 版本
     if sys.version_info < (3, 11):
         errors.append(
             "❌ Python 版本过低\n"
@@ -25,59 +27,23 @@ def _check_env():
             "   下载: https://www.python.org/downloads/"
         )
 
-    # 2. 检查关键依赖
-    missing_pkgs = []
-    for pkg, import_name, desc in [
-        ("pymupdf", "fitz", "PDF 文本提取"),
-        ("nltk", "nltk", "句子分词"),
-        ("rich", "rich", "终端美化"),
-        ("tenacity", "tenacity", "API 重试"),
+    # 2. 关键依赖 (快速检测, 不实际导入)
+    for pkg_name, desc in [
+        ("pymupdf", "PDF 文本提取"),
+        ("rich", "终端美化"),
     ]:
-        try:
-            __import__(import_name)
-        except ImportError:
-            missing_pkgs.append(f"  {pkg:20s} — {desc}")
+        if importlib.util.find_spec(pkg_name) is None:
+            errors.append(f"❌ 缺少依赖: {pkg_name} ({desc})\n  修复: uv sync")
 
-    if missing_pkgs:
-        errors.append(
-            "❌ 缺少依赖包\n"
-            + "\n".join(missing_pkgs) +
-            "\n\n修复方法:\n"
-            "  uv sync"
-        )
-
-    # 3. 检查 uv（如果是 git clone 的新用户可能没装）
-    try:
-        subprocess.run(["uv", "--version"], capture_output=True, timeout=5)
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        errors.append(
-            "❌ 未找到 uv 包管理器\n\n"
-            "安装方法:\n"
-            "  pip install uv\n"
-            "  # 然后运行: uv sync"
-        )
-
-    # 4. 检查 config.json
+    # 3. config.json
     config_path = Path(__file__).parent / "config.json"
-    has_config = config_path.exists()
-    if has_config:
-        try:
-            cfg = json.loads(config_path.read_text(encoding="utf-8"))
-            has_api_key = bool(cfg.get("api_key", "").strip())
-        except Exception:
-            has_api_key = False
-    else:
-        has_api_key = False
-
-    if not has_api_key:
+    if not config_path.exists():
         errors.append(
-            "❌ 未配置 API Key\n\n"
-            "创建 config.json 并填入 DeepSeek API Key:\n"
-            '  {"api_key": "sk-你的key", "model": "deepseek-v4-pro"}\n\n'
-            "获取免费 API Key: https://platform.deepseek.com/"
+            "❌ 未找到 config.json\n\n"
+            '  创建 config.json: {"api_key": "sk-你的key", "model": "deepseek-v4-pro"}\n'
+            "  获取 Key: https://platform.deepseek.com/"
         )
 
-    # 5. 显示所有错误
     if errors:
         print("\n" + "=" * 55)
         print("  Itranslation — 环境检测")
@@ -87,8 +53,6 @@ def _check_env():
         print("\n" + "=" * 55)
         print("  修复后重新运行: uv run python desktop.py")
         print("=" * 55 + "\n")
-
-        # 如果有 GUI 能力，弹窗提示
         try:
             import tkinter.messagebox as mb
             root = __import__("tkinter").Tk()
@@ -100,11 +64,7 @@ def _check_env():
             root.destroy()
         except Exception:
             pass
-
         sys.exit(1)
-
-    # === 可选功能检测（仅警告，不阻止启动）===
-    _check_optional_features()
 
     return True
 
