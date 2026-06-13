@@ -35,6 +35,7 @@ console = Console()
 
 
 def main():
+    start_time = time.time()
     parser = argparse.ArgumentParser(
         description="book-translation — AI 全书翻译工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -269,7 +270,7 @@ def main():
     assemble_book(full_translations, output_path, bilingual=args.bilingual, fmt=args.format)
 
     # === 完成 ===
-    _print_summary(cfg, len(chapters), total_chunks, len(issues), output_path)
+    _print_summary(cfg, len(chapters), total_chunks, len(issues), output_path, start_time)
 
 
 def _call_deepseek(cfg: dict, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> tuple[str, dict]:
@@ -363,13 +364,16 @@ def _check_cli_features(cfg: dict, args):
         console.print()
 
 
-def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: int, output_path: str):
+def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: int, output_path: str, start_time: float = 0):
     cost = cfg.get("_cost", {})
     prompt_tokens = cost.get("prompt_tokens", 0)
     completion_tokens = cost.get("completion_tokens", 0)
 
     model = cfg.get("model", "")
     cost_val, cost_str = calc_cost(model, prompt_tokens, completion_tokens)
+
+    elapsed = time.time() - start_time if start_time else 0
+    dur_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
 
     console.print()
     console.print("=" * 55)
@@ -383,6 +387,7 @@ def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: in
         console.print(f"  费用: ${cost_val:.4f} (~¥{cost_val * 7.2:.2f})")
     else:
         console.print(f"  费用: 自定义模型，费用未知")
+    console.print(f"  用时: {dur_str}")
     console.print(f"  输出: {output_path}")
     console.print("=" * 55)
 

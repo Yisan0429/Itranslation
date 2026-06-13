@@ -226,6 +226,8 @@ class App:
         self.extract_var = StringVar(value="fitz (文本, 快速)")
         self.running = False; self.paused = False
         self._pause_event = __import__("threading").Event(); self._pause_event.set()
+        self._start_time = 0.0
+        self._timer_id = None
         self.output_file = None
 
         self._load_settings()
@@ -288,6 +290,7 @@ class App:
         self.phase_lbl=Label(p,text="就绪",font=FONT,fg=GRAY,bg=BG,anchor="w");self.phase_lbl.pack(fill="x")
         self.bar=Progressbar(p,mode="determinate");self.bar.pack(fill="x",pady=(3,1))
         self.pct_lbl=Label(p,text="—",font=FS,fg=GRAY,bg=BG);self.pct_lbl.pack(anchor="e")
+        self.time_lbl=Label(p,text="",font=FS,fg=GRAY,bg=BG);self.time_lbl.pack(anchor="e")
         self.result_lbl=Label(p,text="",font=FONT,fg=ACC,bg=BG,anchor="w",wraplength=290)
         self.result_lbl.pack(fill="x",pady=(8,0))
         self.open_btn=Button(p,text="打开译文",command=self._open,font=FONT,bg=LGRAY,relief="flat",padx=10,pady=2,cursor="hand2")
@@ -335,6 +338,31 @@ class App:
         self.root.after(0,lambda:self.bar.configure(maximum=max(total,1)))
         self.root.after(0,lambda:self.bar.configure(value=done))
         self.root.after(0,lambda:self.pct_lbl.configure(text=f"{done} / {total}"))
+    def _update_timer(self):
+        """更新计时器显示（已用时间 + 预估剩余时间）。每秒调用一次。"""
+        if not self.running or self._start_time == 0:
+            return
+        elapsed = time.time() - self._start_time
+        elapsed_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
+        text = f"⏱ {elapsed_str}"
+        # 如果有进度，计算 ETA
+        done = self.bar.cget("value")
+        total = self.bar.cget("maximum")
+        if done > 0 and total > 0 and done < total:
+            eta = elapsed / done * (total - done)
+            eta_str = f"{int(eta//60)}:{int(eta%60):02d}"
+            text += f"  |  剩余 ~{eta_str}"
+        self.time_lbl.configure(text=text)
+        self._timer_id = self.root.after(1000, self._update_timer)
+
+    def _start_timer(self):
+        self._start_time = time.time()
+        self._update_timer()
+
+    def _stop_timer(self):
+        if self._timer_id:
+            self.root.after_cancel(self._timer_id)
+            self._timer_id = None
     def _toggle_pause(self):
         if not self.running: return
         self.paused=not self.paused
@@ -348,6 +376,7 @@ class App:
         self.running=True;self.paused=False;self._pause_event.set()
         self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸")
         self.open_btn.pack_forget();self.result_lbl.configure(text="");self._set(self.ov,"")
+        self._start_timer()
         threading.Thread(target=self._run,args=(path,),daemon=True).start()
 
     def _checkpoint_path(self, book_path):
@@ -586,14 +615,18 @@ class App:
             self.root.after(0, lambda: self._fail(str(e)))
 
     def _done(self, n, cost_str):
+        self._stop_timer()
+        elapsed = time.time() - self._start_time
+        dur = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
         self.running = False; self.paused = False
         self.btn.configure(text="开始翻译", state=NORMAL)
         self.pause_btn.configure(state=DISABLED, text="⏸")
         self.phase_lbl.configure(text="翻译完成")
-        self.result_lbl.configure(text=f"{n}\n{cost_str}")
+        self.result_lbl.configure(text=f"{n}\n{cost_str}\n用时 {dur}")
         self.open_btn.pack(pady=(4, 0))
 
     def _fail(self, msg):
+        self._stop_timer()
         self.running=False;self.paused=False;self.btn.configure(text="开始翻译",state=NORMAL)
         self.pause_btn.configure(state=DISABLED,text="⏸");self.phase_lbl.configure(text=f"失败: {msg}")
     def _open(self):
