@@ -198,6 +198,9 @@ class App:
         self.rat_var = BooleanVar(value=False)
         self._status_text = "● 就绪"
         self._status_color = "#8a8a8a"
+        self._ui_phase = "就绪"
+        self._ui_done = 0
+        self._ui_total = 1
         self.running = False; self.paused = False
         self._pause_event = __import__("threading").Event(); self._pause_event.set()
         self._start_time = 0.0
@@ -330,33 +333,73 @@ class App:
     def _set(self,w,text):
         w.configure(state=NORMAL); w.delete("1.0",END); w.insert("1.0",text); w.configure(state=DISABLED)
     def _update_ui(self,phase,done,total):
-        self.root.after(0,lambda:self.phase_lbl.configure(text=phase))
-        self.root.after(0,lambda:self.bar.configure(maximum=max(total,1)))
-        self.root.after(0,lambda:self.bar.configure(value=done))
-        self.root.after(0,lambda:self.pct_lbl.configure(text=f"{done} / {total}"))
+        self._ui_phase = phase
+        self._ui_done = done
+        self._ui_total = max(total, 1)
         self._set_status(phase, "#111")
-    def _update_timer(self):
-        """更新计时器显示（已用时间 + 预估剩余时间）。每秒调用一次。"""
-        if not self.running or self._start_time == 0:
+    def _refresh_ui(self):
+        """主线程定时刷新全部 UI（从共享变量读取，零跨线程调用）。"""
+        # 处理完成/失败事件
+        if getattr(self, '_translation_done', False):
+            self._translation_done = False
+            self._stop_timer()
+            self.running = False; self.paused = False
+            self.btn.configure(text="开始翻译", state=NORMAL)
+            self.pause_btn.configure(state=DISABLED, text="⏸")
+            self.abort_btn.configure(state=DISABLED)
+            self.phase_lbl.configure(text="翻译完成")
+            elapsed = time.time() - self._start_time
+            dur = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
+            self._set(self.ov, getattr(self, '_output_text', ''))
+            self.result_lbl.configure(text=f"{self._completion_info}\n用时 {dur}")
+            self.output_file = self._output_file
+            self.open_btn.pack(pady=(4, 0))
+            self._set_status("✓ 翻译完成", "#16a34a")
+            self.status_lbl.configure(text=self._status_text, fg=self._status_color)
             return
-        elapsed = time.time() - self._start_time
-        elapsed_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
-        text = f"⏱ {elapsed_str}"
-        # 如果有进度，计算 ETA
-        done = self.bar.cget("value")
-        total = self.bar.cget("maximum")
-        if done > 0 and total > 0 and done < total:
-            eta = elapsed / done * (total - done)
-            eta_str = f"{int(eta//60)}:{int(eta%60):02d}"
-            text += f"  |  剩余 ~{eta_str}"
-        self.time_lbl.configure(text=text)
-        # 同步状态栏（从共享变量读取，线程安全）
+
+        if getattr(self, '_translation_failed', False):
+            self._translation_failed = False
+            self._stop_timer()
+            self.running = False; self.paused = False
+            self.btn.configure(text="开始翻译", state=NORMAL)
+            self.pause_btn.configure(state=DISABLED, text="⏸")
+            self.abort_btn.configure(state=DISABLED)
+            self.phase_lbl.configure(text=f"失败: {self._error_msg}")
+            self._set_status(f"✗ {self._error_msg}", "#dc2626")
+            self.status_lbl.configure(text=self._status_text, fg=self._status_color)
+            return
+
+        if getattr(self, '_aborted', False):
+            self._aborted = False
+            self._stop_timer()
+            self.running = False
+            self.btn.configure(text="开始翻译", state=NORMAL)
+            self.pause_btn.configure(state=DISABLED, text="⏸")
+            self.abort_btn.configure(state=DISABLED)
+            self.phase_lbl.configure(text="已放弃")
+            self._set_status("✗ 已放弃", "#dc2626")
+            self.status_lbl.configure(text=self._status_text, fg=self._status_color)
+            return
+
+        if self.running:
+            self.phase_lbl.configure(text=self._ui_phase)
+            self.bar.configure(maximum=self._ui_total)
+            self.bar.configure(value=self._ui_done)
+            self.pct_lbl.configure(text=f"{self._ui_done} / {self._ui_total}")
+            elapsed = time.time() - self._start_time
+            elapsed_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
+            t = f"⏱ {elapsed_str}"
+            if self._ui_done > 0 and self._ui_total > 0 and self._ui_done < self._ui_total:
+                eta = elapsed / self._ui_done * (self._ui_total - self._ui_done)
+                t += f"  |  剩余 ~{int(eta//60)}:{int(eta%60):02d}"
+            self.time_lbl.configure(text=t)
         self.status_lbl.configure(text=self._status_text, fg=self._status_color)
-        self._timer_id = self.root.after(1000, self._update_timer)
+        self._timer_id = self.root.after(200, self._refresh_ui)
 
     def _start_timer(self):
         self._start_time = time.time()
-        self._update_timer()
+        self._refresh_ui()
 
     def _stop_timer(self):
         if self._timer_id:
@@ -706,10 +749,10 @@ class App:
             model_name = cfg.get("model", "")
             cost_val, cost_str = calc_cost(model_name if not use_custom else "", pt, ct_val)
 
-            self.root.after(0, lambda: self._set(self.ov,
-                "\n\n".join(txt for _, txt in full)[:10000]))
-            self.output_file = actual_path
-            self.root.after(0, lambda: self._done(oname, cost_str))
+            self._output_text = "\n\n".join(txt for _, txt in full)[:10000]
+            self._output_file = actual_path
+            self._completion_info = f"{oname}\n{cost_str}"
+            self._translation_done = True
 
             # 翻译完成，清理 checkpoint
             try:
@@ -720,9 +763,11 @@ class App:
         except Exception as e:
             err = str(e)
             if "翻译已取消" in err or (not self.running):
-                self.root.after(0, lambda: self._abort())
+                self._error_msg = ""
+                self._aborted = True
             else:
-                self.root.after(0, lambda: self._fail(err))
+                self._error_msg = err
+                self._translation_failed = True
 
     def _done(self, n, cost_str):
         self._stop_timer()
