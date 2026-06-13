@@ -295,6 +295,17 @@ class App:
         self.result_lbl.pack(fill="x",pady=(8,0))
         self.open_btn=Button(p,text="打开译文",command=self._open,font=FONT,bg=LGRAY,relief="flat",padx=10,pady=2,cursor="hand2")
 
+        # 底部状态栏
+        sf = Frame(p, bg="#eef2f5", height=26)
+        sf.pack(side="bottom", fill="x", pady=(12, 0))
+        sf.pack_propagate(False)
+        self.status_lbl = Label(sf, text="● 就绪", font=("Microsoft YaHei UI", 8),
+                                fg="#8a8a8a", bg="#eef2f5", anchor="w", padx=8)
+        self.status_lbl.pack(fill="both", expand=True)
+
+    def _set_status(self, text, color="#8a8a8a"):
+        self.status_lbl.configure(text=text, fg=color)
+
     def _custom_model(self):
         dlg=Toplevel(self.root); dlg.title("自定义模型"); dlg.geometry("420x280"); dlg.configure(bg=BG)
         dlg.transient(self.root); dlg.grab_set()
@@ -338,6 +349,7 @@ class App:
         self.root.after(0,lambda:self.bar.configure(maximum=max(total,1)))
         self.root.after(0,lambda:self.bar.configure(value=done))
         self.root.after(0,lambda:self.pct_lbl.configure(text=f"{done} / {total}"))
+        self._set_status(phase, "#111")
     def _update_timer(self):
         """更新计时器显示（已用时间 + 预估剩余时间）。每秒调用一次。"""
         if not self.running or self._start_time == 0:
@@ -366,8 +378,8 @@ class App:
     def _toggle_pause(self):
         if not self.running: return
         self.paused=not self.paused
-        if self.paused: self._pause_event.clear(); self.pause_btn.configure(text="▶"); self.phase_lbl.configure(text="⏸ 已暂停 — 点击 ▶ 继续")
-        else: self._pause_event.set(); self.pause_btn.configure(text="⏸"); self.phase_lbl.configure(text="翻译中...")
+        if self.paused: self._pause_event.clear(); self.pause_btn.configure(text="▶"); self.phase_lbl.configure(text="⏸ 已暂停 — 点击 ▶ 继续"); self._set_status("⏸ 已暂停", "#d97706")
+        else: self._pause_event.set(); self.pause_btn.configure(text="⏸"); self.phase_lbl.configure(text="翻译中..."); self._set_status("● 翻译中...", "#111")
     def _start(self):
         if self.running: return
         path=self.input_path.get()
@@ -376,6 +388,7 @@ class App:
         self.running=True;self.paused=False;self._pause_event.set()
         self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸")
         self.open_btn.pack_forget();self.result_lbl.configure(text="");self._set(self.ov,"")
+        self._set_status("● 翻译中...", "#111")
         self._start_timer()
         threading.Thread(target=self._run,args=(path,),daemon=True).start()
 
@@ -622,6 +635,7 @@ class App:
         self.btn.configure(text="开始翻译", state=NORMAL)
         self.pause_btn.configure(state=DISABLED, text="⏸")
         self.phase_lbl.configure(text="翻译完成")
+        self._set_status("✓ 翻译完成", "#16a34a")
         self.result_lbl.configure(text=f"{n}\n{cost_str}\n用时 {dur}")
         self.open_btn.pack(pady=(4, 0))
 
@@ -629,6 +643,7 @@ class App:
         self._stop_timer()
         self.running=False;self.paused=False;self.btn.configure(text="开始翻译",state=NORMAL)
         self.pause_btn.configure(state=DISABLED,text="⏸");self.phase_lbl.configure(text=f"失败: {msg}")
+        self._set_status(f"✗ {msg}", "#dc2626")
     def _open(self):
         if self.output_file and Path(self.output_file).exists(): os.startfile(self.output_file)
 
