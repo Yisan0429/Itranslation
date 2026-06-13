@@ -236,7 +236,7 @@ Itranslation/
 ### 功能维度对比
 
 | 维度 | Itranslation v1.1 | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | epub-translator |
-|---|---:|---:|---:|---:|---:|---:|
+|:---|:---:|:---:|:---:|:---:|:---:|
 | 桌面 GUI | ✓ | — | ✓（需 Calibre） | — | — |
 | 断点续传 | ✓（GUI+CLI） | ✓ | ✓ | ✓ | — |
 | 并行翻译 | ✓（章节级） | ✓（API 批量） | ✓（多书并行） | — | ✓ |
