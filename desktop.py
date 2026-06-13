@@ -155,7 +155,7 @@ CUSTOM_MODEL = {"model":"", "base":"", "key":""}
 
 
 def call_api(cfg, sp, up, max_tokens=8192):
-    import urllib.request
+    import urllib.request, socket
     key = cfg.get("api_key","") or os.environ.get("DEEPSEEK_API_KEY","")
     if not key: raise ValueError("未设置 API Key")
     payload = json.dumps({
@@ -163,13 +163,21 @@ def call_api(cfg, sp, up, max_tokens=8192):
         "messages":[{"role":"system","content":sp},{"role":"user","content":up}],
         "temperature":cfg.get("temperature",0.3),"max_tokens":max_tokens,"stream":False
     }).encode()
-    req = urllib.request.Request(f"{cfg.get('api_base','https://api.deepseek.com/v1')}/chat/completions",
+    url = f"{cfg.get('api_base','https://api.deepseek.com/v1')}/chat/completions"
+    req = urllib.request.Request(url,
         data=payload,headers={"Content-Type":"application/json","Authorization":f"Bearer {key}"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        d = json.loads(r.read())
-        return d["choices"][0]["message"]["content"].strip(),{
-            "prompt_tokens":d.get("usage",{}).get("prompt_tokens",0),
-            "completion_tokens":d.get("usage",{}).get("completion_tokens",0)}
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(120)
+    try:
+        with urllib.request.urlopen(req) as r:
+            d = json.loads(r.read())
+            return d["choices"][0]["message"]["content"].strip(),{
+                "prompt_tokens":d.get("usage",{}).get("prompt_tokens",0),
+                "completion_tokens":d.get("usage",{}).get("completion_tokens",0)}
+    except Exception as e:
+        raise RuntimeError(f"API 调用失败 ({url}): {e}")
+    finally:
+        socket.setdefaulttimeout(old_timeout)
 
 # ═══════════════════════════════════════════════════════════
 class App:
@@ -278,7 +286,7 @@ class App:
         self.status_lbl.pack(fill="both", expand=True)
 
     def _set_status(self, text, color="#8a8a8a"):
-        self.status_lbl.configure(text=text, fg=color)
+        self.root.after(0, lambda: self.status_lbl.configure(text=text, fg=color))
 
     def _custom_model(self):
         dlg=Toplevel(self.root); dlg.title("自定义模型"); dlg.geometry("420x280"); dlg.configure(bg=BG)
