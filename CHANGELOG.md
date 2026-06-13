@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.1.4 (2026-06-14)
+
+### 🏗️ 架构改进
+- **API 客户端解耦** — 将 `_call_deepseek` 提取为独立的 `src/api_client.py`，消除 `eval.py` ↔ `translate_book.py` 的循环导入
+- **统一重试机制** — `call_api()` 内置指数退避重试，KG 预读等直接 API 调用不再缺失重试保护
+
+### 🐛 修复
+- 并行模式下 `cfg["_cost"]` token 计数竞态条件（使用 `cost_lock` 保护累加操作）
+- `_print_header` 版本号 "v3" → "v1.1.4"
+- `_split_by_separator` fallback 增加期望句子数验证，LLM 未遵循 ␟ 分隔指令时给出警告
+- `extract_text()` 添加多编码自动检测（utf-8 → gbk → gb2312 → gb18030 → latin-1），兼容 Windows 下 GBK 编码的 TXT 文件
+- 移除未使用的 `nltk` 依赖，减小安装体积
+- 移除 `--bilingual` CLI 参数（原为 no-op，未实际实现双语输出功能）
+
+### 📖 文档
+- README 中英双版全面更新：移除不存在 GUI 的安装说明和 FAQ 引用
+- 版本号统一为 v1.1.4
+- 新增 API 内置重试说明
+- config.py 新增 API Key 安全提示注释
+
+### 🔧 维护
+- `eval.py` 硬编码 DeepSeek 定价替换为 `calc_cost()` 调用
+- `eval.py` 改为从 `api_client` 导入，不再依赖 `translate_book.py` 私有函数
+
 ## v1.1.3 (2026-06-14)
 
 ### ⚡ 架构变更

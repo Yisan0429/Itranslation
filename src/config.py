@@ -19,6 +19,9 @@ DEFAULT_CONFIG = {
     # === LLM 配置 ===
     "provider": "deepseek",
     "model": "deepseek-v4-pro",
+    # 安全提示: API Key 可通过环境变量 DEEPSEEK_API_KEY 设置，
+    # 或写入 config.json（config.json 已被 .gitignore 排除，不会提交到 Git）。
+    # 生产环境建议使用环境变量方式。
     "api_key": os.environ.get("DEEPSEEK_API_KEY", ""),
     "api_base": "https://api.deepseek.com/v1",
     "temperature": 0.3,

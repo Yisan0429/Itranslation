@@ -11,6 +11,7 @@ Retrieval-Augmented Translation:
 
 import json
 import time
+import threading
 from typing import Callable
 from rich.console import Console
 
@@ -33,6 +34,7 @@ def translate_chapter(
     llm_call: Callable,
     config: dict,
     checkpoint_path: str = None,
+    cost_lock: threading.Lock = None,
 ) -> list[str]:
     console.print(f"\n[bold]📖 翻译章节: {chapter_title} ({len(chunks)} 块)[/bold]")
 
@@ -72,10 +74,12 @@ def translate_chapter(
             llm_call, system_prompt, user_prompt, chunk.id, config
         )
 
-        # 累加成本
-        total_cost = config.setdefault("_cost", {"prompt_tokens": 0, "completion_tokens": 0})
-        total_cost["prompt_tokens"] += usage.get("prompt_tokens", 0)
-        total_cost["completion_tokens"] += usage.get("completion_tokens", 0)
+        # 累加成本（线程安全）
+        if cost_lock:
+            with cost_lock:
+                _accumulate_cost(config, usage)
+        else:
+            _accumulate_cost(config, usage)
 
         # 4. 存储到向量库
         if vector_store is not None:
@@ -113,6 +117,13 @@ def translate_chapter(
         console.print(f"  [{i+1}/{len(chunks)}] ✅ {chunk.id}")
 
     return translations
+
+
+def _accumulate_cost(config: dict, usage: dict):
+    """累加翻译 token 成本到 config['_cost']。"""
+    total_cost = config.setdefault("_cost", {"prompt_tokens": 0, "completion_tokens": 0})
+    total_cost["prompt_tokens"] += usage.get("prompt_tokens", 0)
+    total_cost["completion_tokens"] += usage.get("completion_tokens", 0)
 
 
 def _build_rat_context(chunk, vector_store, glossary: dict, kg: dict, config: dict) -> list[dict]:
@@ -200,25 +211,14 @@ def _extract_glossary_terms(text: str, glossary: dict) -> list[str]:
 
 
 def _call_with_retry(llm_call: Callable, system_prompt: str, user_prompt: str, chunk_id: str, config: dict) -> tuple[str, dict]:
-    max_retries = config.get("max_retries", 3)
-    base_delay = config.get("retry_base_delay", 2)
-    max_delay = config.get("retry_max_delay", 60)
-
-    last_error = None
-    for attempt in range(max_retries):
-        try:
-            result, usage = llm_call(system_prompt, user_prompt)
-            if not result or not result.strip():
-                raise ValueError("LLM returned empty response")
-            return result.strip(), usage
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries - 1:
-                delay = min(base_delay * (2 ** attempt), max_delay)
-                console.print(f"  [yellow]⚠️ {chunk_id} 第{attempt+1}次失败: {e}，{delay}s 后重试[/yellow]")
-                time.sleep(delay)
-
-    raise RuntimeError(f"{chunk_id} 翻译失败（{max_retries} 次重试后）: {last_error}")
+    """API 调用包装器。call_api 已内置重试，此处提供友好错误处理。"""
+    try:
+        result, usage = llm_call(system_prompt, user_prompt)
+        if not result or not result.strip():
+            raise ValueError("LLM returned empty response")
+        return result.strip(), usage
+    except Exception as e:
+        raise RuntimeError(f"{chunk_id} 翻译失败: {e}")
 
 
 def _update_consistency(source: str, target: str, glossary: dict, model: ConsistencyModel, chunk_id: str):

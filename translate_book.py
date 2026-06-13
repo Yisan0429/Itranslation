@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 import time
+import threading
 from pathlib import Path
 
 from rich.console import Console
@@ -31,6 +32,7 @@ from vector_store import TranslationVectorStore
 from consistency import ConsistencyModel, generate_consistency_report
 from translator import translate_chapter
 from assembler import assemble_translations, assemble_book
+from api_client import call_api
 
 console = Console()
 
@@ -54,7 +56,6 @@ def main():
     parser.add_argument("--overlap", help="重叠句子数（覆盖默认值）", type=int, default=None)
     parser.add_argument("--output", help="输出文件路径", default=None)
     parser.add_argument("--format", help="输出格式 (txt|md|pdf)", default="txt")
-    parser.add_argument("--bilingual", help="输出双语对照", action="store_true")
     parser.add_argument("--parallel", help="并行翻译线程数（默认 0=禁用，建议 4）", type=int, default=0)
     parser.add_argument("--clear-cache", help="清空向量存储并重新翻译", action="store_true")
     parser.add_argument("-v", "--verbose", help="详细输出", action="store_true")
@@ -104,7 +105,7 @@ def main():
 
     if not args.no_preread and cfg.get("enable_agentic_preread", True):
         def llm_for_kg(system_prompt, user_prompt):
-            return _call_deepseek(cfg, system_prompt, user_prompt, max_tokens=4096)
+            return _make_llm_call(cfg, system_prompt, user_prompt, max_tokens=4096)
 
         kg = build_knowledge_graph(
             book_md,
@@ -127,7 +128,8 @@ def main():
     if cfg["genre"] == "auto":
         kg_genre = kg.get("book_metadata", {}).get("genre", "natural_science")
         cfg["genre"] = kg_genre
-        console.print(f"  自动检测体裁: {kg_genre}")
+        if not args.no_preread:
+            console.print(f"  自动检测体裁: {kg_genre}")
 
     # === Phase 1: 分块 ===
     console.print("\n[bold cyan]━━━ Phase 1: 语义分块 ━━━[/bold cyan]")
@@ -176,23 +178,23 @@ def main():
 
     # LLM 调用函数
     def llm_translate(system_prompt, user_prompt):
-        return _call_deepseek(cfg, system_prompt, user_prompt,
+        return _make_llm_call(cfg, system_prompt, user_prompt,
                               max_tokens=cfg.get("max_tokens_per_chunk", 4096))
 
     all_chapter_translations = []
 
     if parallel_workers > 1 and len(all_chapter_chunks) > 1:
         # 并行翻译
-        import threading
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         cost_lock = threading.Lock()
+        consistency_lock = threading.Lock()
 
         def translate_one(title, chunks):
             cm = ConsistencyModel()
             checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
             def llm_call(sp, up):
-                return _call_deepseek(cfg, sp, up,
+                return _make_llm_call(cfg, sp, up,
                                       max_tokens=cfg.get("max_tokens_per_chunk", 4096))
             trans = translate_chapter(
                 chapter_title=title, chunks=chunks,
@@ -200,9 +202,10 @@ def main():
                 consistency_model=cm, glossary=glossary, kg=kg,
                 llm_call=llm_call, config=cfg,
                 checkpoint_path=checkpoint_path,
+                cost_lock=cost_lock,
             )
             # 合并一致性模型
-            with cost_lock:
+            with consistency_lock:
                 for term_en, usages in cm.term_usage.items():
                     for zh, count in usages.items():
                         consistency_model.term_usage[term_en][zh] += count
@@ -272,63 +275,30 @@ def main():
         )
         full_translations.append((title, full_text))
 
-    assemble_book(full_translations, output_path, bilingual=args.bilingual, fmt=args.format)
+    assemble_book(full_translations, output_path, fmt=args.format)
 
     # === 完成 ===
     _print_summary(cfg, len(chapters), total_chunks, len(issues), output_path, start_time)
 
 
-def _call_deepseek(cfg: dict, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> tuple[str, dict]:
-    """调用 DeepSeek API（OpenAI 兼容格式）。
-
-    Returns:
-        (translated_text, usage_dict) where usage_dict has prompt_tokens, completion_tokens
-    """
-    import urllib.request
-    import urllib.error
-
-    api_key = cfg.get("api_key") or cfg.get("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise ValueError("未设置 DEEPSEEK_API_KEY。请设置环境变量或在 config.json 中配置。")
-
-    api_base = cfg.get("api_base", "https://api.deepseek.com/v1")
-    model = cfg.get("model", "deepseek-v4-pro")
-
-    payload = json.dumps({
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": cfg.get("temperature", 0.3),
-        "max_tokens": max_tokens,
-        "stream": False,
-    }).encode("utf-8")
-
-    url = f"{api_base}/chat/completions"
-    req = urllib.request.Request(url, data=payload, headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    })
-
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read())
-            content = result["choices"][0]["message"]["content"]
-            usage = result.get("usage", {})
-            return content.strip(), {
-                "prompt_tokens": usage.get("prompt_tokens", 0),
-                "completion_tokens": usage.get("completion_tokens", 0),
-            }
-    except urllib.error.HTTPError as e:
-        body = e.read().decode() if e.fp else str(e)
-        raise RuntimeError(f"API 错误 ({e.code}): {body[:500]}")
-    except Exception as e:
-        raise RuntimeError(f"API 调用失败: {e}")
+def _make_llm_call(cfg: dict, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> tuple[str, dict]:
+    """通过 api_client 封装调用 LLM API（内置重试）。"""
+    return call_api(
+        api_key=cfg.get("api_key") or cfg.get("DEEPSEEK_API_KEY", ""),
+        api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
+        model=cfg.get("model", "deepseek-v4-pro"),
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        max_tokens=max_tokens,
+        temperature=cfg.get("temperature", 0.3),
+        max_retries=cfg.get("max_retries", 3),
+        retry_base_delay=cfg.get("retry_base_delay", 2),
+        retry_max_delay=cfg.get("retry_max_delay", 30),
+    )
 
 
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):
-    table = Table(title="📚 book-translation v3", show_header=False)
+    table = Table(title="📚 book-translation v1.1.4", show_header=False)
     table.add_column(style="bold cyan")
     table.add_column()
     table.add_row("输入", book_path)

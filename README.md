@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.1.3-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.4-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
@@ -11,11 +11,13 @@
 </p>
 
 <h1 align="center">Itranslation</h1>
-<p align="center"><strong>AI-Powered Book Translation · Desktop GUI & CLI</strong></p>
+<p align="center"><strong>AI-Powered Book Translation · CLI</strong></p>
 <p align="center">
   PDF · EPUB · TXT · Markdown → Chinese<br>
-  Sentence-Level Chunking · Consistency Audit · Pause/Resume · Cost Tracking
+  Sentence-Level Chunking · Overlap Redundancy · Consistency Audit · Checkpoint/Resume · Cost Tracking
 </p>
+
+> **Note:** The desktop GUI is temporarily unavailable in v1.1.4 while tkinter threading issues are being resolved. This release is CLI-only. The previous GUI code is preserved in `.archive/`.
 
 ---
 
@@ -71,14 +73,12 @@ uv sync --extra rat
 ### Launch
 
 ```bash
-# Desktop GUI
-uv run python desktop.py
-
-# Command line
+# Basic translation
 uv run python translate_book.py book.pdf --genre literature --format pdf
-```
 
-On Windows, `book-translation.vbs` provides a silent GUI launcher (no terminal window).
+# Full pipeline with parallel translation
+uv run python translate_book.py book.pdf --genre philosophy --parallel 4 --format pdf
+```
 
 ---
 
@@ -239,8 +239,8 @@ Itranslation/
 
 | Dimension | Itranslation v1.1 | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | epub-translator |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| Desktop GUI | — | — | ✓ (via Calibre) | — | — |
-| Checkpoint/Resume | ✓ (GUI + CLI) | ✓ | ✓ | ✓ | — |
+| Desktop GUI | — (CLI-only v1.1.4) | — | ✓ (via Calibre) | — | — |
+| Checkpoint/Resume | ✓ (CLI) | ✓ | ✓ | ✓ | — |
 | Parallel Translation | ✓ (chapter-level) | ✓ (API batch) | ✓ (multi-book) | — | ✓ |
 | Sentence-Level Chunking | ✓ | — | — | — | — |
 | Overlap Redundancy | ✓ | — | — | — | — |
@@ -257,14 +257,14 @@ Itranslation/
 ### Unique Advantages
 
 1. **Translation Quality Pipeline.** Sentence-level chunking, overlap redundancy, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project.
-2. **Desktop GUI.** The only standalone tool in this comparison that offers both a native desktop interface and a CLI — suitable for non-technical users without requiring additional software such as Calibre.
-3. **Cost Transparency.** Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
+2. **Cost Transparency.** Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
+3. **API with Built-in Retry.** All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
 
-### Known Gaps
+### Known Limitations
 
-1. **No bilingual output.** Both bilingual_book_maker and epub-translator produce side-by-side bilingual editions — a frequently requested feature not yet available.
-2. **Early-stage ecosystem.** v1.1 versus competitors with years of community-driven iteration and bug fixes.
-3. **Limited input format coverage.** Four formats (PDF, EPUB, TXT, MD) versus Calibre Plugin's 48.
+1. **No desktop GUI.** Removed in v1.1.4 while tkinter threading issues are resolved. Previous GUI code preserved in `.archive/`.
+2. **Limited input format coverage.** Four formats (PDF, EPUB, TXT, MD) versus Calibre Plugin's 48.
+3. **No scan PDF support.** Requires Marker model download (~2 GB).
 
 ---
 
@@ -272,7 +272,7 @@ Itranslation/
 
 **What happens if the network drops mid-translation?**
 
-Both the GUI and CLI persist translation progress after every chapter. Re-running on the same file detects the existing checkpoint and offers to resume from the interruption point.
+The CLI persists translation progress after every chapter. Re-running on the same file detects the existing checkpoint and offers to resume from the interruption point.
 
 **Can scanned/image-based PDFs be translated?**
 
@@ -280,7 +280,7 @@ Yes, using the Marker visual extraction engine. Select "marker (视觉, 90%+ 精
 
 **Can I use my own LLM provider?**
 
-Select "自定义..." from the model dropdown, then click the gear icon (⚙) to configure the API base URL, model name, and API key. Any OpenAI-compatible endpoint is supported (Ollama, vLLM, Groq, etc.).
+Use `--model` and `--api-base` to configure any OpenAI-compatible API endpoint (Ollama, vLLM, Groq, etc.). Or set `api_base` and `api_key` in `config.json`.
 
 **How do I run the environment checker?**
 

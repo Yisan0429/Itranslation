@@ -159,10 +159,22 @@ def extract_epub(epub_path: str) -> str:
 
 
 def extract_text(txt_path: str) -> str:
-    """读取纯文本文件。"""
+    """读取纯文本文件（自动检测编码）。"""
     console.print("[cyan]📝 读取文本文件...[/cyan]")
-    with open(txt_path, "r", encoding="utf-8") as f:
-        text = f.read()
+
+    # 尝试常见编码，优先 UTF-8
+    for encoding in ("utf-8", "utf-8-sig", "gbk", "gb2312", "gb18030", "latin-1"):
+        try:
+            with open(txt_path, "r", encoding=encoding) as f:
+                text = f.read()
+            if encoding != "utf-8":
+                console.print(f"[dim]  检测到编码: {encoding}[/dim]")
+            break
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+    else:
+        raise ValueError(f"无法识别文件编码: {txt_path}。请将文件转为 UTF-8 编码。")
+
     console.print(f"[green]✅ 文本读取完成 ({len(text)} 字符)[/green]")
     return text
 

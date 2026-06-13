@@ -60,7 +60,7 @@ def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
 
     for chunk, trans in zip(chunks, translations):
         # 按 ␟ 切分译文
-        sentences = _split_by_separator(trans)
+        sentences = _split_by_separator(trans, expected_count=chunk.end_sentence - chunk.start_sentence + 1)
         chunk_sent_map.append((chunk, sentences))
 
     # 按 chunk 顺序处理（保证"第一次出现"的语义）
@@ -78,9 +78,16 @@ def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
     return "\n".join(result)
 
 
-def _split_by_separator(text: str) -> list[str]:
-    """按 ␟ 切分译文句子。"""
-    # 先去除首尾空白
+def _split_by_separator(text: str, expected_count: int = None) -> list[str]:
+    """按 ␟ 切分译文句子。
+
+    Args:
+        text: LLM 输出的译文
+        expected_count: 期望的句子数（用于验证）
+
+    Returns:
+        句子列表
+    """
     text = text.strip()
 
     # 按分隔符切分
@@ -90,6 +97,13 @@ def _split_by_separator(text: str) -> list[str]:
     # 如果切不出来（LLM 没按指令用分隔符），回退到按行切
     if len(parts) <= 1:
         parts = [line.strip() for line in text.split("\n") if line.strip()]
+
+    # 验证：如果期望句子数和实际差距过大，记录警告
+    if expected_count and len(parts) != expected_count:
+        console.print(
+            f"  [yellow]⚠️ 句子数不匹配: 期望 {expected_count}, 实际 {len(parts)}"
+            f" — LLM 可能未遵循 ␟ 分隔指令[/yellow]"
+        )
 
     return parts
 

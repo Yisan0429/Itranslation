@@ -17,7 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()  # src/ → project root
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import load_config
+from config import load_config, calc_cost
 from chunker import chunk_text, _split_sentences
 from consistency import ConsistencyModel
 from assembler import assemble_translations
@@ -216,11 +216,20 @@ def eval_kg_builder():
         print("  ⚠ 未配置 API Key, 跳过在线评估")
         return {"available": False}
 
+    from api_client import call_api
     from kg_builder import build_knowledge_graph, kg_to_glossary
 
     def llm_call(sp, up):
-        from translate_book import _call_deepseek
-        return _call_deepseek(cfg, sp, up, max_tokens=4096)
+        return call_api(
+            api_key=cfg.get("api_key", ""),
+            api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
+            model=cfg.get("model", "deepseek-v4-pro"),
+            system_prompt=sp,
+            user_prompt=up,
+            max_tokens=4096,
+            temperature=cfg.get("temperature", 0.3),
+            max_retries=cfg.get("max_retries", 3),
+        )
 
     try:
         print("  发送预读请求到 DeepSeek...")
@@ -253,7 +262,7 @@ def eval_kg_builder():
 
 
 # ═══════════════════════════════════════════════════════════
-# 5. End-to-End 翻译质量对比
+# 5. End-to-End 翻译流程验证
 # ═══════════════════════════════════════════════════════════
 
 def eval_e2e():
@@ -266,8 +275,20 @@ def eval_e2e():
         print("  ⚠ 未配置 API Key, 跳过")
         return {"available": False}
 
+    from api_client import call_api
     from translator import translate_chapter
-    from translate_book import _call_deepseek as call_api
+
+    def llm(sp, up):
+        return call_api(
+            api_key=cfg.get("api_key", ""),
+            api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
+            model=cfg.get("model", "deepseek-v4-pro"),
+            system_prompt=sp,
+            user_prompt=up,
+            max_tokens=cfg.get("max_tokens_per_chunk", 8192),
+            temperature=cfg.get("temperature", 0.3),
+            max_retries=cfg.get("max_retries", 3),
+        )
 
     # 用样本文字做一次完整翻译
     text = SAMPLE_TEXT
@@ -276,8 +297,6 @@ def eval_e2e():
                         overlap_sentences=3)
 
     cm = ConsistencyModel()
-    def llm(sp, up):
-        return call_api(cfg, sp, up, max_tokens=cfg.get("max_tokens_per_chunk", 8192))
 
     print(f"  输入: {len(text)} 字符 → {len(chunks)} 块")
     print(f"  翻译中...")
@@ -296,16 +315,19 @@ def eval_e2e():
         if len(full) < len(text) * 0.3:
             issues.append(f"译文过短 ({len(full)} vs {len(text)} 原文)")
 
-        # 成本
+        # 成本（使用统一的 calc_cost）
         cost = cfg.get("_cost", {})
         pt = cost.get("prompt_tokens", 0)
         ct = cost.get("completion_tokens", 0)
-        est_cost = pt / 1e6 * 0.435 + ct / 1e6 * 0.87
+        cost_val, cost_str = calc_cost(cfg.get("model", ""), pt, ct)
 
         print(f"  输出: {len(full)} 字符")
         print(f"  块数: {len(trans)}")
         print(f"  Token: {pt:,}入 + {ct:,}出")
-        print(f"  费用: ${est_cost:.4f} (~¥{est_cost*7.2:.2f})")
+        if cost_val is not None:
+            print(f"  费用: ${cost_val:.4f} (~¥{cost_val * 7.2:.2f})")
+        else:
+            print(f"  费用: 自定义模型，费用未知")
         print(f"  耗时: {elapsed:.1f}s")
         print(f"  输出预览: {full[:150]}...")
 

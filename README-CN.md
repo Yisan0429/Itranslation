@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.1.3-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.1.4-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
@@ -11,11 +11,13 @@
 </p>
 
 <h1 align="center">Itranslation</h1>
-<p align="center"><strong>AI 全书翻译工具 · 桌面 GUI + 命令行</strong></p>
+<p align="center"><strong>AI 全书翻译工具 · 命令行</strong></p>
 <p align="center">
   PDF · EPUB · TXT · Markdown → 中文<br>
-  句子级分块 · 术语一致性审计 · 暂停恢复 · 成本追踪
+  句子级分块 · 重叠冗余 · 术语一致性审计 · 断点续传 · 成本追踪
 </p>
+
+> **说明：** 桌面 GUI 在 v1.1.4 中暂时不可用，等待 tkinter 跨线程问题修复。当前版本为纯 CLI。之前的 GUI 代码保留在 `.archive/` 中。
 
 ---
 
@@ -71,14 +73,12 @@ uv sync --extra rat
 ### 启动
 
 ```bash
-# 桌面 GUI
-uv run python desktop.py
-
-# 命令行
+# 基础翻译
 uv run python translate_book.py book.pdf --genre literature --format pdf
-```
 
-Windows 用户可运行 `book-translation.vbs` 实现无终端窗口的静默启动。
+# 完整管线 + 并行翻译
+uv run python translate_book.py book.pdf --genre philosophy --parallel 4 --format pdf
+```
 
 ---
 
@@ -239,8 +239,8 @@ Itranslation/
 
 | 维度 | Itranslation v1.1 | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | epub-translator |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| 桌面 GUI | ✓ | — | ✓（需 Calibre） | — | — |
-| 断点续传 | ✓（GUI+CLI） | ✓ | ✓ | ✓ | — |
+| 桌面 GUI | —（CLI-only v1.1.4） | — | ✓（需 Calibre） | — | — |
+| 断点续传 | ✓（CLI） | ✓ | ✓ | ✓ | — |
 | 并行翻译 | ✓（章节级） | ✓（API 批量） | ✓（多书并行） | — | ✓ |
 | 句子级分块 | ✓ | — | — | — | — |
 | 重叠冗余 | ✓ | — | — | — | — |
@@ -257,14 +257,14 @@ Itranslation/
 ### 差异化优势
 
 1. **翻译质量闭环。** 句子级分块、重叠冗余、实时术语审计三者形成"翻译→验证→纠偏"的完整质量闭环。在所有可比较的开源项目中，没有任何一个同时具备这三项能力。
-2. **桌面 GUI 零门槛。** 对比范围内唯一同时提供原生桌面界面和命令行的独立翻译工具——无需安装 Calibre 等外部平台，非技术用户可直接使用。
+2. **API 内置重试。** 所有 LLM API 调用均内置指数退避重试机制（可通过 `config.json` 配置），确保网络波动时的稳定性。
 3. **成本透明可控。** token 消耗和预估费用（美元/人民币双币种）实时更新。自定义模型明确标注"费用未知"，不显示错误定价。
 
 ### 已知不足
 
-1. **暂无双语对照输出。** bilingual_book_maker 和 epub-translator 的核心卖点，属高频需求。
-2. **生态尚处早期。** v1.1 对比竞品数年迭代和社区积累，在成熟度上存在客观差距。
-3. **输入格式有限。** 目前支持 4 种格式，而 Calibre 插件支持 48 种。
+1. **暂无桌面 GUI。** v1.1.4 中已移除，等待 tkinter 跨线程问题解决。之前的 GUI 代码保存在 `.archive/` 中。
+2. **输入格式有限。** 目前支持 4 种格式，而 Calibre 插件支持 48 种。
+3. **暂不支持扫描版 PDF。** 需额外下载 Marker 模型（约 2 GB）。
 
 ---
 
@@ -272,7 +272,7 @@ Itranslation/
 
 **翻译中途网络断了怎么办？**
 
-GUI 与 CLI 均在每章完成后保存进度。中断后重新翻译同一文件，系统会自动检测 checkpoint 并询问是否从断点继续。
+CLI 在每章完成后保存进度。中断后重新翻译同一文件，系统会自动检测 checkpoint 并询问是否从断点继续。
 
 **扫描版 PDF 能翻译吗？**
 
@@ -280,7 +280,7 @@ GUI 与 CLI 均在每章完成后保存进度。中断后重新翻译同一文�
 
 **能否使用自己的模型服务？**
 
-在模型下拉框选择「自定义...」，点击齿轮图标（⚙），填写 API Base URL、Model Name 和 API Key。支持 Ollama、vLLM、Groq 等任何 OpenAI 兼容接口。
+通过 `--model` 和 `--api-base` 参数配置任何 OpenAI 兼容 API（Ollama、vLLM、Groq 等）。或在 `config.json` 中设置 `api_base` 和 `api_key`。
 
 **如何检测可选功能是否就绪？**
 
