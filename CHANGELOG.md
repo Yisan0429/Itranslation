@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.1.3 (2026-06-14)
+
+### ⚡ 架构变更
+- **暂时移除 GUI** — desktop.py / VBS / 快捷方式备份至 `.archive/`
+- 当前发布为 CLI-only 版本
+- GUI 解决 tkinter 跨线程问题后重新加入
+
+### 🐛 修复
+- `call_api` urlopen 显式 timeout=90
+- 重试最大延迟 60→30s
+- 每块 API 调用时显示进度状态
+
 ## v1.1.2 (2026-06-13)
 
 ### 🚀 新增
