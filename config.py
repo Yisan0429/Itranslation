@@ -80,7 +80,7 @@ DEFAULT_CONFIG = {
     "batch_delimiter": "\n\n␞␞␞\n\n",
     "max_retries": 3,
     "retry_base_delay": 2,
-    "retry_max_delay": 60,
+    "retry_max_delay": 30,
 }
 
 

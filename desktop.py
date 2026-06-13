@@ -167,9 +167,9 @@ def call_api(cfg, sp, up, max_tokens=8192):
     req = urllib.request.Request(url,
         data=payload,headers={"Content-Type":"application/json","Authorization":f"Bearer {key}"})
     old_timeout = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(120)
+    socket.setdefaulttimeout(90)
     try:
-        with urllib.request.urlopen(req) as r:
+        with urllib.request.urlopen(req, timeout=90) as r:
             d = json.loads(r.read())
             return d["choices"][0]["message"]["content"].strip(),{
                 "prompt_tokens":d.get("usage",{}).get("prompt_tokens",0),
