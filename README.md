@@ -170,7 +170,7 @@ Based on DeepSeek V4 Pro pricing and measured throughput:
 | Novel | 100,000 | ~150K in / 140K out | ~7 min | ~$0.20 (¥1.44) |
 | Epic | 300,000 | ~450K in / 420K out | ~20 min | ~$0.60 (¥4.32) |
 
-Measured: 1,196-word literary excerpt → 2 chunks → $0.0076 (¥0.06) in 10 seconds.
+Measured: 1,196-word literary excerpt → 2 chunks → $0.0076 (¥0.06) .
 
 Cost calculation is automatic for DeepSeek models. Custom models display token counts without a monetary estimate to prevent misleading figures.
 
