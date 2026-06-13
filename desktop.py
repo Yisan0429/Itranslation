@@ -298,6 +298,8 @@ class App:
         self.btn.pack(side="left",fill="x",expand=True)
         self.pause_btn=Button(br,text="⏸",command=self._toggle_pause,font=FB,bg=LGRAY,relief="flat",padx=8,pady=5,cursor="hand2",state=DISABLED)
         self.pause_btn.pack(side="left",padx=(4,0))
+        self.abort_btn=Button(br,text="放弃",command=self._abort,font=FB,bg="#fee2e2",fg="#dc2626",relief="flat",padx=8,pady=5,cursor="hand2",state=DISABLED)
+        self.abort_btn.pack(side="left",padx=(4,0))
 
         self.phase_lbl=Label(p,text="就绪",font=FONT,fg=GRAY,bg=BG,anchor="w");self.phase_lbl.pack(fill="x")
         self.bar=Progressbar(p,mode="determinate");self.bar.pack(fill="x",pady=(3,1))
@@ -392,13 +394,22 @@ class App:
         self.paused=not self.paused
         if self.paused: self._pause_event.clear(); self.pause_btn.configure(text="▶"); self.phase_lbl.configure(text="⏸ 已暂停 — 点击 ▶ 继续"); self._set_status("⏸ 已暂停", "#d97706")
         else: self._pause_event.set(); self.pause_btn.configure(text="⏸"); self.phase_lbl.configure(text="翻译中..."); self._set_status("● 翻译中...", "#111")
+    def _abort(self):
+        if not self.running: return
+        self.running = False
+        self._stop_timer()
+        self.btn.configure(text="开始翻译", state=NORMAL)
+        self.pause_btn.configure(state=DISABLED, text="⏸")
+        self.abort_btn.configure(state=DISABLED)
+        self.phase_lbl.configure(text="已放弃")
+        self._set_status("✗ 已放弃", "#dc2626")
     def _start(self):
         if self.running: return
         path=self.input_path.get()
         if not path or not Path(path).exists(): messagebox.showerror("错误","请选择文件"); return
         if not self.api_key_var.get().strip(): messagebox.showerror("错误","请输入 API Key"); return
         self.running=True;self.paused=False;self._pause_event.set()
-        self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸")
+        self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸");self.abort_btn.configure(state=NORMAL)
         self.open_btn.pack_forget();self.result_lbl.configure(text="");self._set(self.ov,"")
         self._set_status("● 翻译中...", "#111")
         self._start_timer()
@@ -668,6 +679,8 @@ class App:
                         })
 
             if failed:
+                if not self.running:
+                    raise RuntimeError("翻译已取消")
                 raise RuntimeError(f"{len(failed)} 章翻译失败: " + "; ".join(
                     f"{t}: {e}" for t, e in failed))
 
@@ -705,7 +718,11 @@ class App:
                 pass
 
         except Exception as e:
-            self.root.after(0, lambda: self._fail(str(e)))
+            err = str(e)
+            if "翻译已取消" in err or (not self.running):
+                self.root.after(0, lambda: self._abort())
+            else:
+                self.root.after(0, lambda: self._fail(err))
 
     def _done(self, n, cost_str):
         self._stop_timer()
@@ -714,6 +731,7 @@ class App:
         self.running = False; self.paused = False
         self.btn.configure(text="开始翻译", state=NORMAL)
         self.pause_btn.configure(state=DISABLED, text="⏸")
+        self.abort_btn.configure(state=DISABLED)
         self.phase_lbl.configure(text="翻译完成")
         self._set_status("✓ 翻译完成", "#16a34a")
         self.result_lbl.configure(text=f"{n}\n{cost_str}\n用时 {dur}")
@@ -722,7 +740,8 @@ class App:
     def _fail(self, msg):
         self._stop_timer()
         self.running=False;self.paused=False;self.btn.configure(text="开始翻译",state=NORMAL)
-        self.pause_btn.configure(state=DISABLED,text="⏸");self.phase_lbl.configure(text=f"失败: {msg}")
+        self.pause_btn.configure(state=DISABLED,text="⏸");self.abort_btn.configure(state=DISABLED)
+        self.phase_lbl.configure(text=f"失败: {msg}")
         self._set_status(f"✗ {msg}", "#dc2626")
     def _open(self):
         if self.output_file and Path(self.output_file).exists(): os.startfile(self.output_file)
