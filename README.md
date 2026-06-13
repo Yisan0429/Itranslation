@@ -189,25 +189,55 @@ Itranslation/
 
 ## 与同类项目对比
 
-| | Itranslation | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) ⭐9.3k | [Calibre 插件](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) ⭐2.5k |
-|---|---|---|---|
-| 桌面 GUI | ✅ tkinter 原生 | ❌ | ✅ Calibre 集成 |
-| 句子级分块 | ✅ | ❌ (10行硬切) | ❌ (段落级) |
-| 术语一致性 | ✅ 实时审计 | ⚠️ 滑动窗口 | ❌ |
-| 暂停/恢复 | ✅ ⏸ | ❌ | ❌ |
-| 成本显示 | ✅ $/¥ 实时 | ❌ | ❌ |
-| 多模型 | ✅ 预设+自定义⚙ | ✅ 多 provider | ✅ 多引擎 |
-| 输出格式 | TXT/MD/PDF | 双语 EPUB/TXT | 全 Calibre 格式 |
-| 断点续传 | ✅ CLI | ✅ .bin 文件 | ✅ hash 缓存 |
-| 双语输出 | ❌ | ✅ | ❌ |
-| 成熟度 | v1.0.0 | 5 年维护 | 3 年维护 |
+### Top 5 开源竞品（按 GitHub 星标排序）
+
+| # | 项目 | ⭐ Stars | 定位 | 核心优势 | 主要局限 |
+|---|------|---------|------|---------|---------|
+| 1 | [Immersive Translate](https://github.com/immersive-translate/immersive-translate) | 17.8k | 浏览器扩展 + 网页/PDF/EPUB 翻译 | 全平台覆盖、100+ 语言、实时双语 | 需装扩展、非独立翻译工具、Pro 收费 |
+| 2 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI 电子书翻译 | 生态成熟（5年）、双语输出、40+ 模型 | 无 GUI、硬切分块、无术语审计 |
+| 3 | [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | 2.5k | Calibre 插件 | 48 种格式输入、20 种输出、多引擎 | 依赖 Calibre、学习成本高 |
+| 4 | [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 1.7k | 通用电子书翻译 | 多格式、v2 架构现代化、SQLite 缓存 | 仅 CLI、无翻译质量审计 |
+| 5 | [epub-translator](https://github.com/oomol-lab/epub-translator) | 771 | EPUB 双语翻译库 | 100% 保格式、API 接口齐全 | 仅 EPUB、生态较新 |
+
+### Itranslation vs 全维度对比
+
+| 维度 | Itranslation v1.1 | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | epub-translator |
+|------|:---:|:---:|:---:|:---:|:---:|
+| **桌面 GUI** | ✅ tkinter | ❌ | ✅ 集成 | ❌ | ❌ |
+| **断点续传** | ✅ GUI+CLI | ✅ .bin | ✅ hash | ✅ SQLite | ❌ |
+| **并行翻译** | ✅ 章节级 | ✅ API batch | ✅ 多书 | ❌ 串行 | ✅ 并发 |
+| **句子级分块** | ✅ 不切断 | ❌ 10 行硬切 | ❌ 段落级 | ❌ token 切 | ✅ 段落级 |
+| **重叠冗余** | ✅ 3-4 句 | ❌ | ❌ | ❌ | ❌ |
+| **术语一致性** | ✅ 实时审计 | ⚠️ 滑动窗口 | ❌ | ❌ | ❌ |
+| **体裁适配** | ✅ 5 种 | ⚠️ prompt 可调 | ❌ | ⚠️ 上下文文件 | ❌ |
+| **知识图谱预读** | ✅ Agentic KG | ❌ | ❌ | ❌ | ❌ |
+| **RAT 检索增强** | ✅ ChromaDB | ❌ | ❌ | ❌ | ❌ |
+| **成本显示** | ✅ $/¥ 实时 | ❌ | ❌ | ❌ | ✅ token 统计 |
+| **双语输出** | ❌ | ✅ | ❌ | ❌ | ✅ 核心卖点 |
+| **输出格式** | TXT/MD/PDF | 双语 EPUB/TXT | 20 种 | EPUB/TXT | EPUB |
+| **模型支持** | DeepSeek+自定义 | 40+ (liteLLM) | 多引擎 | OpenAI 系 | OpenAI/Claude |
+| **成熟度** | v1.1 (2026) | 5 年 | 3 年 | v2 (2025) | v0.1 (2025) |
+
+### 核心差异化
+
+Itranslation 的三个独有优势：
+
+1. **翻译质量导向** — 句子级分块不切断 + 重叠冗余 + 术语一致性实时审计，形成"翻译→验证→纠偏"闭环。同类项目中没有任何一个同时具备这三项。
+2. **桌面 GUI 零门槛** — 选文件→点按钮→出结果。是唯一同时提供桌面 GUI 和 CLI 的独立翻译工具（Calibre 插件需要先装 Calibre）。
+3. **成本透明** — 实时显示每条 API 调用的 token 消耗和费用（$ 和 ¥ 双币种），自定义模型明确标注"费用未知"不误导。
+
+三个明确短板（正在补）：
+
+1. **无双语输出** — bilingual_book_maker 和 epub-translator 的核心卖点
+2. **生态太新** — v1.1 vs 竞品数年的迭代和社区
+3. **输入格式有限** — PDF/EPUB/TXT/MD vs Calibre 插件的 48 种
 
 ---
 
 ## 常见问题
 
 **翻一半网络断了怎么办？**
-CLI 有 checkpoint 机制，重跑自动跳过已翻译的块。GUI 暂不支持，需重新开始。
+CLI 和 GUI 都支持 checkpoint 断点续传。中断后重新翻译同一文件，自动检测进度并询问是否从断点继续。
 
 **扫描版 PDF 能翻吗？**
 需要 marker 视觉提取（选 PDF 提取方式为 "marker"）。首次使用会下载约 2GB 模型。

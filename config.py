@@ -63,6 +63,20 @@ DEFAULT_CONFIG = {
     # === CPU/GPU ===
     "use_gpu": True,
 
+    # === 并行 ===
+    "parallel_workers": 4,  # 并行翻译章节数（0=禁用）
+
+    # === 文件限制 ===
+    "max_input_file_mb": 100,  # 输入文件最大 MB（超出警告）
+    "max_input_file_mb_abort": 500,  # 硬限制，超过拒绝
+
+    # === 定价 ===
+    # 定价表: (input_per_1M, output_per_1M)。自定义模型为 None 时不显示费用
+    "pricing": {
+        "deepseek-v4-pro":   {"input": 0.435, "output": 0.87},
+        "deepseek-v4-flash": {"input": 0.14,  "output": 0.28},
+    },
+
     # === 高级 ===
     "batch_delimiter": "\n\n␞␞␞\n\n",
     "max_retries": 3,
@@ -87,3 +101,17 @@ def save_config(cfg, path=None):
     save_path = Path(path) if path else (PROJECT_ROOT / "config.json")
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+
+def calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: dict = None) -> tuple[float | None, str]:
+    """计算翻译成本。返回 (美元金额, 显示字符串)。
+
+    自定义模型（无定价）返回 (None, 提示信息)。
+    """
+    if pricing is None:
+        pricing = DEFAULT_CONFIG["pricing"]
+    rate = pricing.get(model)
+    if rate is None:
+        return None, f"{prompt_tokens:,}+{completion_tokens:,} tokens (自定义模型，费用未知)"
+    cost = prompt_tokens / 1_000_000 * rate["input"] + completion_tokens / 1_000_000 * rate["output"]
+    return cost, f"{prompt_tokens:,}+{completion_tokens:,} tokens · ${cost:.4f} (~¥{cost * 7.2:.2f})"

@@ -22,7 +22,7 @@ from rich.table import Table
 PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import load_config, save_config, DEFAULT_CONFIG
+from config import load_config, save_config, DEFAULT_CONFIG, calc_cost
 from extractor import extract_book
 from kg_builder import build_knowledge_graph, kg_to_glossary
 from chunker import chunk_text, parse_structure
@@ -53,6 +53,7 @@ def main():
     parser.add_argument("--output", help="输出文件路径", default=None)
     parser.add_argument("--format", help="输出格式 (txt|md|pdf)", default="txt")
     parser.add_argument("--bilingual", help="输出双语对照", action="store_true")
+    parser.add_argument("--parallel", help="并行翻译线程数（默认 0=禁用，建议 4）", type=int, default=0)
     parser.add_argument("--clear-cache", help="清空向量存储并重新翻译", action="store_true")
     parser.add_argument("-v", "--verbose", help="详细输出", action="store_true")
 
@@ -74,6 +75,9 @@ def main():
     if args.overlap is not None:
         overlap = args.overlap
     _print_header(args.book, cfg, args.target_tokens, overlap)
+
+    # 可选功能检测
+    _check_cli_features(cfg, args)
 
     # === Phase 0: 提取 + Pre-Read ===
     console.print("\n[bold cyan]━━━ Phase 0: 提取 + 预读 ━━━[/bold cyan]")
@@ -148,7 +152,11 @@ def main():
     console.print(f"  总计: {total_chunks} 块")
 
     # === Phase 2: 翻译 ===
-    console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块) ━━━[/bold cyan]")
+    parallel_workers = args.parallel if args.parallel > 0 else cfg.get("parallel_workers", 0)
+    if parallel_workers > 1:
+        console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块, 并行 {parallel_workers} 线程) ━━━[/bold cyan]")
+    else:
+        console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块) ━━━[/bold cyan]")
 
     # 初始化向量存储
     if args.no_rat:
@@ -169,20 +177,58 @@ def main():
         return _call_deepseek(cfg, system_prompt, user_prompt,
                               max_tokens=cfg.get("max_tokens_per_chunk", 4096))
 
-    for ch_idx, (title, chunks) in enumerate(all_chapter_chunks):
-        checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
-        translations = translate_chapter(
-            chapter_title=title,
-            chunks=chunks,
-            vector_store=vector_store if not args.no_rat else None,
-            consistency_model=consistency_model,
-            glossary=glossary,
-            kg=kg,
-            llm_call=llm_translate,
-            config=cfg,
-            checkpoint_path=checkpoint_path,
-        )
-        all_chapter_translations.append((title, chunks, translations))
+    all_chapter_translations = []
+
+    if parallel_workers > 1 and len(all_chapter_chunks) > 1:
+        # 并行翻译
+        import threading
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        cost_lock = threading.Lock()
+
+        def translate_one(title, chunks):
+            cm = ConsistencyModel()
+            checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
+            def llm_call(sp, up):
+                return _call_deepseek(cfg, sp, up,
+                                      max_tokens=cfg.get("max_tokens_per_chunk", 4096))
+            trans = translate_chapter(
+                chapter_title=title, chunks=chunks,
+                vector_store=vector_store if not args.no_rat else None,
+                consistency_model=cm, glossary=glossary, kg=kg,
+                llm_call=llm_call, config=cfg,
+                checkpoint_path=checkpoint_path,
+            )
+            # 合并一致性模型
+            with cost_lock:
+                for term_en, usages in cm.term_usage.items():
+                    for zh, count in usages.items():
+                        consistency_model.term_usage[term_en][zh] += count
+                for term_en, locs in cm.term_locations.items():
+                    consistency_model.term_locations[term_en].extend(locs)
+            return (title, chunks, trans)
+
+        with ThreadPoolExecutor(max_workers=parallel_workers) as pool:
+            futures = {pool.submit(translate_one, t, c): t for t, c in all_chapter_chunks}
+            for fut in as_completed(futures):
+                title, chunks, trans = fut.result()
+                all_chapter_translations.append((title, chunks, trans))
+    else:
+        # 串行翻译
+        for ch_idx, (title, chunks) in enumerate(all_chapter_chunks):
+            checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
+            translations = translate_chapter(
+                chapter_title=title,
+                chunks=chunks,
+                vector_store=vector_store if not args.no_rat else None,
+                consistency_model=consistency_model,
+                glossary=glossary,
+                kg=kg,
+                llm_call=llm_translate,
+                config=cfg,
+                checkpoint_path=checkpoint_path,
+            )
+            all_chapter_translations.append((title, chunks, translations))
 
     # === Phase 3: QA ===
     console.print("\n[bold cyan]━━━ Phase 3: 质量审计 ━━━[/bold cyan]")
@@ -288,14 +334,42 @@ def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):
     console.print(table)
 
 
+def _check_cli_features(cfg: dict, args):
+    """CLI 模式下检测可选功能，如缺失给出提示。"""
+    try:
+        from env_check import get_optional_features_status
+        status = get_optional_features_status()
+    except Exception:
+        return
+
+    warnings = []
+
+    # 检查 marker（如果没加 --no-vision）
+    if not args.no_vision and not status["marker"]["available"]:
+        warnings.append(f"[yellow]⚠️ {status['marker']['message']}[/yellow]")
+        if status["marker"]["detail"]:
+            warnings.append(f"[dim]{status['marker']['detail']}[/dim]")
+
+    # 检查 RAT（如果没加 --no-rat）
+    if not args.no_rat and not status["rat"]["available"]:
+        warnings.append(f"[yellow]⚠️ {status['rat']['message']}[/yellow]")
+        if status["rat"]["detail"]:
+            warnings.append(f"[dim]{status['rat']['detail']}[/dim]")
+
+    if warnings:
+        console.print()
+        for w in warnings:
+            console.print(w)
+        console.print()
+
+
 def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: int, output_path: str):
     cost = cfg.get("_cost", {})
     prompt_tokens = cost.get("prompt_tokens", 0)
     completion_tokens = cost.get("completion_tokens", 0)
-    # DeepSeek V4 Pro pricing
-    input_cost = prompt_tokens / 1_000_000 * 0.435
-    output_cost = completion_tokens / 1_000_000 * 0.87
-    total_cost = input_cost + output_cost
+
+    model = cfg.get("model", "")
+    cost_val, cost_str = calc_cost(model, prompt_tokens, completion_tokens)
 
     console.print()
     console.print("=" * 55)
@@ -305,7 +379,10 @@ def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: in
     console.print(f"  术语漂移: {num_issues} 个")
     console.print(f"  输入 tokens: {prompt_tokens:,}")
     console.print(f"  输出 tokens: {completion_tokens:,}")
-    console.print(f"  费用: ${total_cost:.4f} (~¥{total_cost * 7.2:.2f})")
+    if cost_val is not None:
+        console.print(f"  费用: ${cost_val:.4f} (~¥{cost_val * 7.2:.2f})")
+    else:
+        console.print(f"  费用: 自定义模型，费用未知")
     console.print(f"  输出: {output_path}")
     console.print("=" * 55)
 

@@ -4,8 +4,9 @@ Itranslation — AI 全书翻译工具
 启动: uv run python desktop.py  (或 python desktop.py)
 """
 
-import ctypes, json, os, sys, subprocess, time, traceback
+import ctypes, json, os, sys, subprocess, time, traceback, threading, hashlib
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ═══════════════════════════════════════════════════════════
 # 环境检测（启动时自动检查，缺什么提示什么）
@@ -102,7 +103,49 @@ def _check_env():
 
         sys.exit(1)
 
+    # === 可选功能检测（仅警告，不阻止启动）===
+    _check_optional_features()
+
     return True
+
+
+def _check_optional_features():
+    """检测可选功能，打印状态但不阻止启动。"""
+    try:
+        from env_check import get_optional_features_status
+        status = get_optional_features_status()
+    except Exception:
+        return
+
+    if status["all_ready"]:
+        return
+
+    print("\n" + "-" * 55)
+    print("  可选功能状态")
+    print("-" * 55)
+    for issue in status["issues"]:
+        print(f"  {issue}")
+    print("-" * 55)
+
+    # 打印简短安装提示
+    any_missing = False
+    if not status["marker"]["available"]:
+        any_missing = True
+    if not status["rat"]["available"]:
+        any_missing = True
+
+    if any_missing:
+        install_needed = []
+        if not status["marker"]["available"]:
+            install_needed.append("  uv sync --extra vision    # marker 视觉 PDF 提取")
+        if not status["rat"]["available"]:
+            install_needed.append("  uv sync --extra rat       # RAT 检索增强翻译")
+            if status["rat"]["chromadb_ready"] and not status["rat"]["st_ready"]:
+                install_needed.append("  uv run python download_model.py  # 下载嵌入模型")
+        print("\n  安装命令:")
+        for cmd in install_needed:
+            print(f"    {cmd}")
+    print("")
 
 
 _check_env()
@@ -127,7 +170,7 @@ from tkinter import (
 )
 from tkinter.ttk import Progressbar, Combobox
 
-from config import load_config
+from config import load_config, calc_cost
 from extractor import extract_book
 from chunker import chunk_text, parse_structure
 from translator import translate_chapter
@@ -305,58 +348,252 @@ class App:
         self.running=True;self.paused=False;self._pause_event.set()
         self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸")
         self.open_btn.pack_forget();self.result_lbl.configure(text="");self._set(self.ov,"")
-        __import__("threading").Thread(target=self._run,args=(path,),daemon=True).start()
-    def _run(self,path):
+        threading.Thread(target=self._run,args=(path,),daemon=True).start()
+
+    def _checkpoint_path(self, book_path):
+        """为每本书生成唯一 checkpoint 路径。"""
+        h = hashlib.md5(str(Path(book_path).resolve()).encode()).hexdigest()[:12]
+        name = Path(book_path).stem
+        return os.path.join(PROJECT_ROOT, "cache", f"gui_checkpoint_{name}_{h}.json")
+
+    def _save_checkpoint(self, ckpt_path, data):
+        Path(ckpt_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(ckpt_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+    def _load_checkpoint(self, ckpt_path):
         try:
-            cfg=load_config()
-            use_custom=self.model_var.get()=="自定义..."
+            with open(ckpt_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _ask_resume(self, ckpt):
+        """询问用户是否恢复断点。在后台线程调用，需要用 after 回到主线程。"""
+        result = {"resume": False}
+        event = threading.Event()
+        def ask():
+            try:
+                completed = ckpt.get("completed_chapters", [])
+                ans = messagebox.askyesno(
+                    "断点续传",
+                    f"发现上次中断的翻译进度。\n\n"
+                    f"已完成 {len(completed)} 章 ({', '.join(completed)})\n"
+                    f"是否从断点继续？"
+                )
+                result["resume"] = ans
+            finally:
+                event.set()
+        self.root.after(0, ask)
+        event.wait()
+        return result["resume"]
+
+    def _run(self, path):
+        try:
+            cfg = load_config()
+            use_custom = self.model_var.get() == "自定义..."
             if use_custom:
-                cfg["api_base"]=CUSTOM_MODEL["base"]; cfg["model"]=CUSTOM_MODEL["model"]
-                if CUSTOM_MODEL.get("key"): cfg["api_key"]=CUSTOM_MODEL["key"]
-                else: cfg["api_key"]=self.api_key_var.get().strip()
+                cfg["api_base"] = CUSTOM_MODEL["base"]; cfg["model"] = CUSTOM_MODEL["model"]
+                if CUSTOM_MODEL.get("key"): cfg["api_key"] = CUSTOM_MODEL["key"]
+                else: cfg["api_key"] = self.api_key_var.get().strip()
             else:
-                md=MODELS.get(self.model_var.get(),MODELS["DeepSeek V4 Pro"])
-                cfg["model"]=md["model"]; cfg["api_base"]=md["base"]; cfg["api_key"]=self.api_key_var.get().strip()
-            genre=self.genre_var.get() or "literature"
-            ov=cfg["overlap_by_genre"].get(genre,3)
-            use_marker="marker" in self.extract_var.get()
-            self._update_ui("Phase 0: 提取...",0,1)
-            md_text=extract_book(path,use_vision=use_marker)
-            chapters=parse_structure(md_text)
-            self._update_ui("Phase 1: 分块...",0,1)
-            all_chunks=[]
+                md = MODELS.get(self.model_var.get(), MODELS["DeepSeek V4 Pro"])
+                cfg["model"] = md["model"]; cfg["api_base"] = md["base"]; cfg["api_key"] = self.api_key_var.get().strip()
+            genre = self.genre_var.get() or "literature"
+            ov = cfg["overlap_by_genre"].get(genre, 3)
+            use_marker = "marker" in self.extract_var.get()
+
+            # 文件大小检查
+            size_mb = Path(path).stat().st_size / (1024 * 1024)
+            max_warn = cfg.get("max_input_file_mb", 100)
+            max_abort = cfg.get("max_input_file_mb_abort", 500)
+            if size_mb > max_abort:
+                raise ValueError(f"文件过大: {size_mb:.0f} MB > {max_abort} MB 限制")
+
+            # --- 断点检查 ---
+            ckpt_path = self._checkpoint_path(path)
+            ckpt = self._load_checkpoint(ckpt_path)
+            resume_from = {}
+            if ckpt:
+                if not self._ask_resume(ckpt):
+                    ckpt = {}  # 用户选择不恢复
+                else:
+                    resume_from = {t["title"]: t for t in ckpt.get("translations", [])}
+                    resumed_chaps = set(ckpt.get("completed_chapters", []))
+                    cost_so_far = ckpt.get("_cost", {"prompt_tokens": 0, "completion_tokens": 0})
+
+            # --- Phase 0: 提取 ---
+            if not ckpt or not ckpt.get("chapters"):
+                self._update_ui("Phase 0: 提取..." + (f" ({size_mb:.0f} MB)" if size_mb > max_warn else ""), 0, 1)
+                md_text = extract_book(path, use_vision=use_marker,
+                                       max_mb=max_warn, max_mb_abort=max_abort)
+                chapters = parse_structure(md_text)
+            else:
+                chapters = ckpt["chapters"]
+                md_text = None
+
+            # --- Phase 1: 分块 ---
+            self._update_ui("Phase 1: 分块...", 0, 1)
+            all_chapter_data = []
             for ch in chapters:
-                ct="\n\n".join(ch.get("paragraphs",[]))
+                ct = "\n\n".join(ch.get("paragraphs", []))
                 if ct.strip():
-                    cks=chunk_text(ct,target_tokens=cfg.get("chunk_target_tokens",1500),max_tokens=cfg.get("chunk_max_tokens",3000),overlap_sentences=ov)
-                    all_chunks.append((ch["title"],cks,ct))
-            total=sum(len(c) for _,c,_ in all_chunks)
-            self._update_ui("Phase 2: 翻译...",0,total)
-            cm=ConsistencyModel()
-            def llm(sp,up): return call_api(cfg,sp,up,max_tokens=cfg.get("max_tokens_per_chunk",8192))
-            all_trans,done=[],0
-            for title,cks,ct in all_chunks:
-                trans=translate_chapter(title,cks,None,cm,{},{},llm,cfg)
-                all_trans.append((title,cks,trans,ct)); done+=len(cks)
-                self._update_ui(f"Phase 2: 翻译...",done,total)
-                while self.paused and self.running: time.sleep(0.3)
-                if not self.running: return
-            self._update_ui("Phase 3: 组装...",total,total)
-            oname=f"{Path(path).stem}_translation"; odir=self.output_dir.get() or str(PROJECT_ROOT/"final")
-            opath=os.path.join(odir,oname); Path(odir).mkdir(parents=True,exist_ok=True)
-            full=[(t,assemble_translations(c,tr,"first_lock")) for t,c,tr,_ in all_trans]
-            assemble_book(full,opath,fmt=self.fmt_var.get())
-            cost=cfg.get("_cost",{});pt=cost.get("prompt_tokens",0);ct2=cost.get("completion_tokens",0)
-            tc=pt/1e6*0.435+ct2/1e6*0.87
-            self.root.after(0,lambda:self._set(self.ov,"\n\n".join(txt for _,txt in full)[:10000]))
-            self.output_file=opath; self.root.after(0,lambda:self._done(oname,tc,pt,ct2))
+                    cks = chunk_text(ct,
+                                     target_tokens=cfg.get("chunk_target_tokens", 1500),
+                                     max_tokens=cfg.get("chunk_max_tokens", 3000),
+                                     overlap_sentences=ov)
+                    all_chapter_data.append((ch["title"], cks, ct))
+            total = sum(len(c) for _, c, _ in all_chapter_data)
+
+            # --- Phase 2: 翻译（并行） ---
+            workers = cfg.get("parallel_workers", 4)
+            self._update_ui(f"Phase 2: 翻译中 (并行 {workers} 线程)...", 0, total)
+
+            # 共享状态
+            cost_lock = threading.Lock()
+            total_cost = {"prompt_tokens": cost_so_far.get("prompt_tokens", 0) if resume_from else 0,
+                          "completion_tokens": cost_so_far.get("completion_tokens", 0) if resume_from else 0}
+            done_count = [0]  # list for mutable ref
+            done_lock = threading.Lock()
+            failed = []
+
+            def translate_one_chapter(title, cks, ct):
+                """翻译单个章节（在子线程中运行）。"""
+                nonlocal failed
+                # 断点恢复：检测已完成的章节
+                if resume_from and title in resumed_chaps:
+                    prev = resume_from[title]
+                    with cost_lock:
+                        total_cost["prompt_tokens"] += prev.get("_pt", 0)
+                        total_cost["completion_tokens"] += prev.get("_ct", 0)
+                    with done_lock:
+                        done_count[0] += len(cks)
+                        self._update_ui(
+                            f"Phase 2: 翻译中 (并行 {workers} 线程)...", done_count[0], total)
+                    return (title, cks, prev["trans"], ct, prev.get("_pt", 0), prev.get("_ct", 0))
+
+                # 每个线程独立的 consistency model
+                cm = ConsistencyModel()
+                def llm(sp, up):
+                    # 检查暂停
+                    while self.paused and self.running:
+                        time.sleep(0.3)
+                    if not self.running:
+                        raise RuntimeError("翻译已取消")
+                    return call_api(cfg, sp, up, max_tokens=cfg.get("max_tokens_per_chunk", 8192))
+
+                trans = translate_chapter(title, cks, None, cm, {}, {}, llm, cfg)
+                pt = cfg.get("_cost", {}).get("prompt_tokens", 0)
+                ct_tok = cfg.get("_cost", {}).get("completion_tokens", 0)
+
+                with cost_lock:
+                    total_cost["prompt_tokens"] += pt
+                    total_cost["completion_tokens"] += ct_tok
+                with done_lock:
+                    done_count[0] += len(cks)
+                    self._update_ui(
+                        f"Phase 2: 翻译中 (并行 {workers} 线程)...", done_count[0], total)
+                return (title, cks, trans, ct, pt, ct_tok)
+
+            all_trans = []
+            completed_chapters = list(resumed_chaps) if resume_from else []
+
+            # 过滤已完成的章节
+            pending = [(t, c, ct) for t, c, ct in all_chapter_data
+                       if t not in (resumed_chaps if resume_from else set())]
+
+            if workers <= 1 or len(pending) <= 1:
+                # 串行模式
+                for title, cks, ct in pending:
+                    if not self.running:
+                        return
+                    result = translate_one_chapter(title, cks, ct)
+                    all_trans.append(result)
+                    completed_chapters.append(title)
+                    # 保存断点
+                    self._save_checkpoint(ckpt_path, {
+                        "book_path": str(Path(path).resolve()),
+                        "chapters": chapters,
+                        "completed_chapters": completed_chapters,
+                        "translations": [
+                            {"title": t, "trans": tr, "_pt": pt, "_ct": ct2}
+                            for t, _, tr, _, pt, ct2 in all_trans
+                        ],
+                        "_cost": total_cost,
+                    })
+            else:
+                # 并行模式
+                with ThreadPoolExecutor(max_workers=workers) as pool:
+                    futures = {pool.submit(translate_one_chapter, t, c, ct): t
+                               for t, c, ct in pending}
+                    for fut in as_completed(futures):
+                        if not self.running:
+                            pool.shutdown(wait=False, cancel_futures=True)
+                            return
+                        try:
+                            result = fut.result()
+                            all_trans.append(result)
+                            completed_chapters.append(result[0])
+                        except Exception as e:
+                            failed.append((futures[fut], str(e)))
+                        # 保存断点
+                        self._save_checkpoint(ckpt_path, {
+                            "book_path": str(Path(path).resolve()),
+                            "chapters": chapters,
+                            "completed_chapters": completed_chapters,
+                            "translations": [
+                                {"title": t, "trans": tr, "_pt": pt, "_ct": ct2}
+                                for t, _, tr, _, pt, ct2 in all_trans
+                            ],
+                            "_cost": total_cost,
+                        })
+
+            if failed:
+                raise RuntimeError(f"{len(failed)} 章翻译失败: " + "; ".join(
+                    f"{t}: {e}" for t, e in failed))
+
+            # --- Phase 3: 组装 ---
+            self._update_ui("Phase 3: 组装...", total, total)
+            oname = f"{Path(path).stem}_translation"
+            odir = self.output_dir.get() or str(PROJECT_ROOT / "final")
+            opath = os.path.join(odir, oname)
+            Path(odir).mkdir(parents=True, exist_ok=True)
+            full = [(t, assemble_translations(c, tr, "first_lock"))
+                    for t, c, tr, _, _, _ in all_trans]
+            output_fmt = self.fmt_var.get()
+            assemble_book(full, opath, fmt=output_fmt)
+            # 根据输出格式确定实际文件路径
+            ext_map = {"txt": ".txt", "md": ".md", "pdf": ".pdf", "epub": ".epub"}
+            actual_path = opath + ext_map.get(output_fmt, ".txt")
+
+            # 成本计算
+            pt = total_cost["prompt_tokens"]; ct_val = total_cost["completion_tokens"]
+            model_name = cfg.get("model", "")
+            cost_val, cost_str = calc_cost(model_name if not use_custom else "", pt, ct_val)
+
+            self.root.after(0, lambda: self._set(self.ov,
+                "\n\n".join(txt for _, txt in full)[:10000]))
+            self.output_file = actual_path
+            self.root.after(0, lambda: self._done(oname, cost_str))
+
+            # 翻译完成，清理 checkpoint
+            try:
+                os.remove(ckpt_path)
+            except Exception:
+                pass
+
         except Exception as e:
-            self.root.after(0,lambda:self._fail(str(e)))
-    def _done(self,n,c,pt,ct):
-        self.running=False;self.paused=False;self.btn.configure(text="开始翻译",state=NORMAL)
-        self.pause_btn.configure(state=DISABLED,text="⏸"); self.phase_lbl.configure(text="翻译完成")
-        self.result_lbl.configure(text=f"{n}\n{pt:,}+{ct:,} tokens · ${c:.4f} (~¥{c*7.2:.2f})"); self.open_btn.pack(pady=(4,0))
-    def _fail(self,msg):
+            self.root.after(0, lambda: self._fail(str(e)))
+
+    def _done(self, n, cost_str):
+        self.running = False; self.paused = False
+        self.btn.configure(text="开始翻译", state=NORMAL)
+        self.pause_btn.configure(state=DISABLED, text="⏸")
+        self.phase_lbl.configure(text="翻译完成")
+        self.result_lbl.configure(text=f"{n}\n{cost_str}")
+        self.open_btn.pack(pady=(4, 0))
+
+    def _fail(self, msg):
         self.running=False;self.paused=False;self.btn.configure(text="开始翻译",state=NORMAL)
         self.pause_btn.configure(state=DISABLED,text="⏸");self.phase_lbl.configure(text=f"失败: {msg}")
     def _open(self):

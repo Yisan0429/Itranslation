@@ -10,6 +10,7 @@ Phase 0: 知识图谱预读器。
 """
 
 import json
+import re
 from pathlib import Path
 from rich.console import Console
 
@@ -173,7 +174,6 @@ def _parse_kg_response(response: str) -> dict:
         pass
 
     # 尝试提取 ```json ... ``` 块
-    import re
     match = re.search(r'```(?:json)?\s*(.*?)\s*```', response, re.DOTALL)
     if match:
         return json.loads(match.group(1))
@@ -234,7 +234,73 @@ def kg_get_style_for_paragraph(kg: dict, para_index: int, total_paras: int) -> d
 
 
 def _zone_matches(desc: str, ratio: float) -> bool:
-    # 简化：不实现复杂解析
+    """解析风格区描述并检查当前位置是否匹配。
+
+    支持格式:
+      "ch1-ch3"          → 按总章数比例
+      "ch1-ch3,ch7-ch9"  → 多区间
+      "introduction"     → 前 5%
+      "preface"          → 前 3%
+      "conclusion"       → 后 10%
+      "epilogue"         → 后 5%
+      "part1" / "part 1" → 按部分比例
+      "all" / ""         → 全匹配
+      "ch4-"             → 第4章及以后
+    """
+    desc = desc.strip().lower()
+    if not desc or desc == "all":
+        return True
+
+    # introduction / preface → 前 5%
+    if desc in ("introduction", "preface", "prologue", "foreword"):
+        return ratio < 0.05
+
+    # conclusion / epilogue / appendix → 后 10%
+    if desc in ("conclusion", "epilogue", "afterword", "appendix", "appendices"):
+        return ratio > 0.90
+
+    # part N → 按部分比例（假设均匀分布）
+    part_match = re.match(r'part\s*(\d+)', desc)
+    if part_match:
+        part_num = int(part_match.group(1))
+        part_start = (part_num - 1) * 0.25
+        part_end = part_num * 0.25
+        return part_start <= ratio < part_end
+
+    # chN-chM 区间匹配（支持逗号分隔多区间）
+    # 将章节号映射到 0-1 比例：ch1 → 0, chMax → 1
+    # 假设最多 20 章
+    max_ch = 20
+    for segment in re.split(r'[,;，；]\s*', desc):
+        segment = segment.strip()
+        range_match = re.match(r'(?:ch(?:apter)?s?\s*)?(\d+)\s*[-–—]\s*(?:ch(?:apter)?s?\s*)?(\d+)', segment)
+        if range_match:
+            start_ch = int(range_match.group(1))
+            end_ch = int(range_match.group(2))
+            start_ratio = (start_ch - 1) / max_ch
+            end_ratio = end_ch / max_ch
+            if start_ratio <= ratio < end_ratio:
+                return True
+            continue
+
+        # ch4-  (从第4章开始)
+        open_match = re.match(r'(?:ch(?:apter)?s?\s*)?(\d+)\s*[-–—]\s*$', segment)
+        if open_match:
+            start_ch = int(open_match.group(1))
+            if ratio >= (start_ch - 1) / max_ch:
+                return True
+            continue
+
+        # 单章 ch5
+        single_match = re.match(r'ch(?:apter)?s?\s*(\d+)$', segment)
+        if single_match:
+            ch = int(single_match.group(1))
+            ch_ratio_start = (ch - 1) / max_ch
+            ch_ratio_end = ch / max_ch
+            if ch_ratio_start <= ratio < ch_ratio_end:
+                return True
+            continue
+
     return False
 
 

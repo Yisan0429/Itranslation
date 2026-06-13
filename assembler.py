@@ -189,6 +189,47 @@ def _write_epub(chapters, path):
     console.print(f"[green]✅ EPUB 已保存到 {path}[/green]")
 
 
+def _find_cjk_font() -> tuple[str, str] | None:
+    """跨平台查找可用的 CJK 字体。返回 (family_name, file_path)。"""
+    import platform
+    system = platform.system()
+
+    candidates = []
+    if system == "Windows":
+        candidates = [
+            ("Microsoft YaHei", "C:/Windows/Fonts/msyh.ttc"),
+            ("Microsoft YaHei", "C:/Windows/Fonts/msyhbd.ttc"),
+            ("SimHei", "C:/Windows/Fonts/simhei.ttf"),
+            ("SimSun", "C:/Windows/Fonts/simsun.ttc"),
+            ("KaiTi", "C:/Windows/Fonts/simkai.ttf"),
+        ]
+    elif system == "Darwin":  # macOS
+        candidates = [
+            ("PingFang SC", "/System/Library/Fonts/PingFang.ttc"),
+            ("Heiti SC", "/System/Library/Fonts/STHeiti Light.ttc"),
+            ("Heiti SC", "/System/Library/Fonts/STHeiti Medium.ttc"),
+            ("Songti SC", "/System/Library/Fonts/STSong.ttc"),
+            ("Hiragino Sans GB", "/System/Library/Fonts/Hiragino Sans GB.ttc"),
+            ("Hiragino Sans GB", "/Library/Fonts/Hiragino Sans GB.ttc"),
+        ]
+    else:  # Linux
+        candidates = [
+            ("Noto Sans CJK SC", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+            ("Noto Sans CJK SC", "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc"),
+            ("Noto Sans SC", "/usr/share/fonts/truetype/noto/NotoSansSC-Regular.ttf"),
+            ("WenQuanYi Micro Hei", "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc"),
+            ("WenQuanYi Zen Hei", "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"),
+            ("Droid Sans Fallback", "/usr/share/fonts/truetype/droid/DroidSansFallbackFull.ttf"),
+            ("SimSun", "/usr/share/fonts/truetype/winfonts/simsun.ttc"),
+        ]
+
+    for name, path in candidates:
+        if Path(path).exists():
+            return name, path
+
+    return None
+
+
 def _write_pdf(chapters, path):
     try:
         from fpdf import FPDF
@@ -198,22 +239,23 @@ def _write_pdf(chapters, path):
         return
 
     pdf = FPDF()
-    # 注册中文字体
-    font_paths = [
-        "C:/Windows/Fonts/msyh.ttc",
-        "C:/Windows/Fonts/simhei.ttf",
-        "C:/Windows/Fonts/simsun.ttc",
-    ]
     font_ok = False
-    for fp in font_paths:
-        if Path(fp).exists():
-            try:
-                pdf.add_font("zh", "", fp, uni=True)
-                pdf.add_font("zh", "B", fp, uni=True)
-                font_ok = True
-                break
-            except Exception:
-                continue
+    font_family = "Helvetica"
+
+    cjk = _find_cjk_font()
+    if cjk:
+        name, fp = cjk
+        try:
+            pdf.add_font("zh", "", fp, uni=True)
+            pdf.add_font("zh", "B", fp, uni=True)
+            font_ok = True
+            font_family = name
+            console.print(f"[cyan]📄 PDF 使用字体: {font_family} ({fp})[/cyan]")
+        except Exception:
+            pass
+
+    if not font_ok:
+        console.print("[yellow]⚠️ 未找到 CJK 中文字体，PDF 可能无法正确显示中文[/yellow]")
 
     pdf.set_auto_page_break(auto=True, margin=15)
     for title, text in chapters:

@@ -23,7 +23,7 @@ chunks/*
 vector_store/*
 !vector_store/.gitkeep
 
-# Models (large)
+# Model cache (large, user-specific)
 models/*
 !models/.gitkeep
 

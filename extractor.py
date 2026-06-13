@@ -167,10 +167,27 @@ def extract_text(txt_path: str) -> str:
     return text
 
 
-def extract_book(book_path: str, use_vision: bool = True) -> str:
-    """自动检测文件类型并提取。"""
+def extract_book(book_path: str, use_vision: bool = True, max_mb: int = 100, max_mb_abort: int = 500) -> str:
+    """自动检测文件类型并提取。
+
+    Args:
+        book_path: 文件路径
+        use_vision: 是否使用 marker 视觉提取
+        max_mb: 超过此大小给出警告
+        max_mb_abort: 超过此大小拒绝处理
+    """
     path = Path(book_path)
     suffix = path.suffix.lower()
+
+    # 文件大小检查
+    size_mb = path.stat().st_size / (1024 * 1024)
+    if size_mb > max_mb_abort:
+        raise ValueError(
+            f"文件过大: {size_mb:.1f} MB，超过硬限制 {max_mb_abort} MB。"
+            f"请拆分文件或使用更小的输入。"
+        )
+    if size_mb > max_mb:
+        console.print(f"[yellow]⚠️ 文件较大 ({size_mb:.1f} MB)，处理可能需要较长时间[/yellow]")
 
     if suffix == ".pdf":
         return extract_pdf(book_path, use_vision=use_vision)

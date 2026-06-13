@@ -1,5 +1,41 @@
 # Changelog
 
+## v1.1.0 (2026-06-13)
+
+### 🚀 新增
+
+**并行翻译**
+- GUI 和 CLI 均支持章节级并行翻译（`--parallel N` 或 `parallel_workers` 配置）
+- 使用线程池，默认 4 线程，可配置
+- 并行模式下每章独立 consistency model，翻译完成后合并审计
+
+**GUI 断点续传**
+- 翻译中断后重启自动检测 checkpoint，弹窗询问是否恢复
+- 每完成一章即保存进度，断电/崩溃不怕
+- 翻译完成后自动清理 checkpoint
+
+**文件大小检查**
+- 输入文件 >100MB 给出警告，>500MB 拒绝处理
+- 阈值可在 config 中调整 (`max_input_file_mb`, `max_input_file_mb_abort`)
+
+### 🔧 修复
+
+**自定义模型成本显示**
+- 非 DeepSeek 模型不再显示错误的费用估算
+- 新增 `calc_cost()` 函数，从 `pricing` 配置表查询
+- 无定价的模型显示"自定义模型，费用未知"
+
+**风格区域匹配 (kg_builder.py)**
+- `_zone_matches()` 从空壳函数改为完整的区间解析器
+- 支持 `ch1-ch3`、`introduction`、`conclusion`、`part1` 等格式
+- 支持逗号分隔多区间，开区间 `ch4-`
+
+**PDF 字体跨平台**
+- `_find_cjk_font()` 新增，自动检测 Windows/macOS/Linux 下的 CJK 字体
+- Windows: 微软雅黑/黑体/宋体等
+- macOS: PingFang SC/Heiti SC/Hiragino Sans GB
+- Linux: Noto Sans CJK/WenQuanYi/Droid Sans Fallback
+
 ## v1.0.0 (2026-06-08)
 
 ### 🚀 首次发布
