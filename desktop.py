@@ -379,12 +379,26 @@ class App:
         path=self.input_path.get()
         if not path or not Path(path).exists(): messagebox.showerror("错误","请选择文件"); return
         if not self.api_key_var.get().strip(): messagebox.showerror("错误","请输入 API Key"); return
+
+        # 在主线程捕获所有 tkinter 变量值（线程安全）
+        gui_state = {
+            "path": path,
+            "model_var": self.model_var.get(),
+            "api_key": self.api_key_var.get().strip(),
+            "genre": self.genre_var.get(),
+            "extract": self.extract_var.get(),
+            "preread": self.preread_var.get(),
+            "rat": self.rat_var.get(),
+            "output_dir": self.output_dir.get(),
+            "output_fmt": self.fmt_var.get(),
+        }
+
         self.running=True;self.paused=False;self._pause_event.set()
         self.btn.configure(text="翻译中...",state=DISABLED);self.pause_btn.configure(state=NORMAL,text="⏸");self.abort_btn.configure(state=NORMAL)
         self.open_btn.pack_forget();self.result_lbl.configure(text="");self._set(self.ov,"")
         self._set_status("● 翻译中...", "#111")
         self._start_timer()
-        threading.Thread(target=self._run,args=(path,),daemon=True).start()
+        threading.Thread(target=self._run,args=(gui_state,),daemon=True).start()
 
     def _checkpoint_path(self, book_path):
         """为每本书生成唯一 checkpoint 路径。"""
@@ -424,20 +438,21 @@ class App:
         event.wait()
         return result["resume"]
 
-    def _run(self, path):
+    def _run(self, gs):
         try:
+            path = gs["path"]
             cfg = load_config()
-            use_custom = self.model_var.get() == "自定义..."
+            use_custom = gs["model_var"] == "自定义..."
             if use_custom:
                 cfg["api_base"] = CUSTOM_MODEL["base"]; cfg["model"] = CUSTOM_MODEL["model"]
                 if CUSTOM_MODEL.get("key"): cfg["api_key"] = CUSTOM_MODEL["key"]
-                else: cfg["api_key"] = self.api_key_var.get().strip()
+                else: cfg["api_key"] = gs["api_key"]
             else:
-                md = MODELS.get(self.model_var.get(), MODELS["DeepSeek V4 Pro"])
-                cfg["model"] = md["model"]; cfg["api_base"] = md["base"]; cfg["api_key"] = self.api_key_var.get().strip()
-            genre = self.genre_var.get() or "literature"
+                md = MODELS.get(gs["model_var"], MODELS["DeepSeek V4 Pro"])
+                cfg["model"] = md["model"]; cfg["api_base"] = md["base"]; cfg["api_key"] = gs["api_key"]
+            genre = gs["genre"] or "literature"
             ov = cfg["overlap_by_genre"].get(genre, 3)
-            use_marker = "marker" in self.extract_var.get()
+            use_marker = "marker" in gs["extract"]
 
             # 文件大小检查
             size_mb = Path(path).stat().st_size / (1024 * 1024)
@@ -474,7 +489,7 @@ class App:
             # --- Pre-Read (可选) ---
             kg = {}
             glossary = {}
-            if self.preread_var.get() and md_text:
+            if gs["preread"] and md_text:
                 self._set_status("预读 → 构建知识图谱...", "#7c3aed")
                 def llm_kg(sp, up):
                     return call_api(cfg, sp, up, max_tokens=4096)
@@ -513,7 +528,7 @@ class App:
 
             # RAG 向量存储
             vector_store = None
-            if self.rat_var.get():
+            if gs["rat"]:
                 self._set_status("初始化 RAG 向量存储...", "#7c3aed")
                 vector_store = TranslationVectorStore(
                     persist_dir=cfg.get("vector_store_dir", str(PROJECT_ROOT / "vector_store")))
@@ -669,12 +684,12 @@ class App:
             self._update_ui("Phase 3/4 组装", total, total)
             self._set_status("组装 → 去重叠合并...", "#2563eb")
             book_name = Path(path).stem
-            odir = os.path.join(self.output_dir.get() or str(PROJECT_ROOT / "output"), book_name)
+            odir = os.path.join(gs["output_dir"] or str(PROJECT_ROOT / "output"), book_name)
             opath = os.path.join(odir, book_name)
             Path(odir).mkdir(parents=True, exist_ok=True)
             full = [(t, assemble_translations(c, tr, "first_lock"))
                     for t, c, tr, _, _, _ in all_trans]
-            output_fmt = self.fmt_var.get()
+            output_fmt = gs["output_fmt"]
             fmt_names = {"txt": "TXT", "md": "Markdown", "pdf": "PDF", "epub": "EPUB"}
             self._set_status(f"组装 → 写入 {fmt_names.get(output_fmt, output_fmt)}...", "#2563eb")
             assemble_book(full, opath, fmt=output_fmt)
