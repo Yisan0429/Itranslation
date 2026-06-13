@@ -6,7 +6,7 @@ import os
 import json
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.resolve()
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()  # src/ → project root
 
 DEFAULT_CONFIG = {
     # === 路径 ===

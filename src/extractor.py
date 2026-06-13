@@ -36,7 +36,7 @@ def extract_pdf(pdf_path: str, use_vision: bool = True) -> str:
 def _extract_with_marker(pdf_path: Path) -> str:
     """用 marker 视觉提取 PDF → Markdown。模型缓存在 D 盘。"""
     import os
-    cache_dir = Path(__file__).parent / "models"
+    cache_dir = Path(__file__).parent.parent / "models"  # src/ → project root
     os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
     os.environ.setdefault("HF_HOME", str(cache_dir / "huggingface"))
     os.environ.setdefault("TRANSFORMERS_CACHE", str(cache_dir / "huggingface" / "hub"))

@@ -20,6 +20,7 @@ from rich.table import Table
 
 # 确保项目根目录在 sys.path 中
 PROJECT_ROOT = Path(__file__).parent.resolve()
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import load_config, save_config, DEFAULT_CONFIG, calc_cost

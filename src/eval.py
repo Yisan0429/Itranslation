@@ -14,7 +14,7 @@ Itranslation — 组件评估脚本 (eval.py)
 import json, time, sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.resolve()
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()  # src/ → project root
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import load_config

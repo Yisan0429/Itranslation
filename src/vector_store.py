@@ -13,7 +13,7 @@ from rich.console import Console
 console = Console()
 
 # 模型缓存路径（与 marker 模型共用 D:\book_translation\models\）
-MODEL_CACHE_DIR = Path(__file__).parent / "models" / "huggingface"
+MODEL_CACHE_DIR = Path(__file__).parent.parent / "models" / "huggingface"  # src/ → project root
 
 # 镜像提示（国内用户可设置 HF_ENDPOINT 或使用 modelscope 下载）
 _HF_MIRROR_HELP = """

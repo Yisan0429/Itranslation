@@ -5,7 +5,7 @@ Optional feature checker — 检测 marker / RAT / sentence-transformers 是否�
 import os
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).parent.resolve()
+PROJECT_ROOT = Path(__file__).parent.parent.resolve()  # src/ → project root
 
 # 缓存目录
 MODEL_CACHE = PROJECT_ROOT / "models"
