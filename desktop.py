@@ -166,7 +166,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from tkinter import (
     Tk, Frame, Label, Button, Entry, filedialog, messagebox, Toplevel,
-    StringVar, Text, DISABLED, NORMAL, END, WORD,
+    StringVar, Text, DISABLED, NORMAL, END, WORD, Checkbutton, BooleanVar,
 )
 from tkinter.ttk import Progressbar, Combobox
 
@@ -176,6 +176,8 @@ from chunker import chunk_text, parse_structure
 from translator import translate_chapter
 from assembler import assemble_translations, assemble_book
 from consistency import ConsistencyModel
+from kg_builder import build_knowledge_graph, kg_to_glossary
+from vector_store import TranslationVectorStore
 
 # ═══════════════════════════════════════════════════════════
 # 配置
@@ -224,6 +226,8 @@ class App:
         self.model_var = StringVar(value="DeepSeek V4 Pro")
         self.api_key_var = StringVar()
         self.extract_var = StringVar(value="fitz (文本, 快速)")
+        self.preread_var = BooleanVar(value=False)
+        self.rat_var = BooleanVar(value=False)
         self.running = False; self.paused = False
         self._pause_event = __import__("threading").Event(); self._pause_event.set()
         self._start_time = 0.0
@@ -280,6 +284,14 @@ class App:
 
         Label(p,text="输出格式",font=FB,fg=ACC,bg=BG).pack(anchor="w",pady=(8,0))
         Combobox(p,textvariable=self.fmt_var,state="readonly",font=FM,values=["txt","md","pdf","epub"],width=18).pack(fill="x",pady=(2,0))
+
+        Label(p,text="高级选项",font=FB,fg=ACC,bg=BG).pack(anchor="w",pady=(14,0))
+        Checkbutton(p,text="Agentic 预读 (知识图谱)",variable=self.preread_var,
+                    font=FONT,bg=BG,fg=FG,selectcolor=BG,activebackground=BG,
+                    cursor="hand2").pack(anchor="w",pady=(2,0))
+        Checkbutton(p,text="RAG 检索增强",variable=self.rat_var,
+                    font=FONT,bg=BG,fg=FG,selectcolor=BG,activebackground=BG,
+                    cursor="hand2").pack(anchor="w",pady=(2,0))
 
         br=Frame(p,bg=BG);br.pack(fill="x",pady=(14,6))
         self.btn=Button(br,text="开始翻译",command=self._start,font=FB,bg=ACC,fg="#fff",relief="flat",padx=12,pady=5,cursor="hand2")
@@ -475,7 +487,27 @@ class App:
                 self._set_status(f"提取完成 — {len(md_text):,} 字符, {len(chapters)} 章", "#16a34a")
             else:
                 chapters = ckpt["chapters"]
-                md_text = None
+                md_text = ckpt.get("md_text", None)
+
+            # --- Pre-Read (可选) ---
+            kg = {}
+            glossary = {}
+            if self.preread_var.get() and md_text:
+                self._set_status("预读 → 构建知识图谱...", "#7c3aed")
+                def llm_kg(sp, up):
+                    return call_api(cfg, sp, up, max_tokens=4096)
+                try:
+                    kg = build_knowledge_graph(md_text, llm_kg,
+                        sample_ratio=cfg.get("preread_sample_ratio", 0.1),
+                        max_sample_tokens=cfg.get("preread_max_sample_tokens", 30000))
+                    glossary = kg_to_glossary(kg)
+                    if cfg["genre"] == "auto":
+                        detected = kg.get("book_metadata", {}).get("genre", "")
+                        if detected and detected != "unknown":
+                            cfg["genre"] = detected
+                    self._set_status(f"预读完成 — {len(glossary)} 术语, 体裁: {cfg.get('genre','?')}", "#16a34a")
+                except Exception as e:
+                    self._set_status(f"预读跳过 ({e})", "#d97706")
 
             # --- Phase 1: 分块 ---
             self._update_ui("Phase 1/4 分块", 0, 1)
@@ -496,6 +528,19 @@ class App:
             workers = cfg.get("parallel_workers", 4)
             mode_str = f"并行 ×{workers}" if (workers > 1 and len(all_chapter_data) > 1) else "串行"
             self._update_ui(f"Phase 2/4 翻译 ({mode_str})", 0, total)
+
+            # RAG 向量存储
+            vector_store = None
+            if self.rat_var.get():
+                self._set_status("初始化 RAG 向量存储...", "#7c3aed")
+                vector_store = TranslationVectorStore(
+                    persist_dir=cfg.get("vector_store_dir", str(PROJECT_ROOT / "vector_store")))
+                vector_store.initialize()
+                if vector_store._initialized:
+                    self._set_status(f"RAG 就绪 ({vector_store.count()} 条记录)", "#16a34a")
+                else:
+                    self._set_status("RAG 不可用 (模型缺失), 继续翻译", "#d97706")
+                    vector_store = None
 
             # 共享状态
             cost_lock = threading.Lock()
@@ -550,7 +595,7 @@ class App:
                         raise RuntimeError("翻译已取消")
                     return call_api(cfg, sp, up, max_tokens=cfg.get("max_tokens_per_chunk", 8192))
 
-                trans = translate_chapter(title, cks, None, cm, {}, {}, llm, cfg)
+                trans = translate_chapter(title, cks, vector_store, cm, glossary, kg, llm, cfg)
                 pt = cfg.get("_cost", {}).get("prompt_tokens", 0)
                 ct_tok = cfg.get("_cost", {}).get("completion_tokens", 0)
 
@@ -586,6 +631,7 @@ class App:
                     self._save_checkpoint(ckpt_path, {
                         "book_path": str(Path(path).resolve()),
                         "chapters": chapters,
+                        "md_text": md_text if md_text else "",
                         "completed_chapters": completed_chapters,
                         "translations": [
                             {"title": t, "trans": tr, "_pt": pt, "_ct": ct2}
@@ -612,6 +658,7 @@ class App:
                         self._save_checkpoint(ckpt_path, {
                             "book_path": str(Path(path).resolve()),
                             "chapters": chapters,
+                            "md_text": md_text if md_text else "",
                             "completed_chapters": completed_chapters,
                             "translations": [
                                 {"title": t, "trans": tr, "_pt": pt, "_ct": ct2}
