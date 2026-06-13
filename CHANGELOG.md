@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.1 (2026-06-13)
+
+### 🔧 快捷方式改进
+- `book-translation.vbs` 重写：自动检测项目目录、静默启动无终端窗口
+- 新增 `install-shortcut.bat` 一键桌面快捷方式安装器
+
+### 📖 文档
+- README 中英双语（README.md + README-CN.md）
+- 修复功能维度对比表格 Markdown 渲染问题
+
 ## v1.1.0 (2026-06-13)
 
 ### 🚀 新增
