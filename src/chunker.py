@@ -58,32 +58,57 @@ def chunk_text(
     return chunks
 
 
+# 列表项检测模式
+_LIST_PATTERN = re.compile(r'^(\s*)([-*+]|\d+\.)\s')
+
+
 def _split_sentences(text: str) -> list[str]:
     """将文本拆分为句子列表，保留段落分隔符。
 
-    优先使用 nltk，fallback 到正则。
+    列表项会被合并为逻辑组，避免跨块断裂。
     """
-    # 正则 fallback（不依赖 nltk data）
     paragraphs = text.split("\n\n")
     all_sentences = []
+    list_buffer = []  # 列表项缓冲区
 
     for para in paragraphs:
         para = para.strip()
         if not para:
-            all_sentences.append("§")  # 小节标记
+            # 先输出缓存的列表项
+            if list_buffer:
+                all_sentences.append("⟨LIST⟩" + " || ".join(list_buffer))
+                list_buffer = []
+            all_sentences.append("§")
             continue
 
         # 检测章节标题
         if para.startswith("#"):
+            if list_buffer:
+                all_sentences.append("⟨LIST⟩" + " || ".join(list_buffer))
+                list_buffer = []
             all_sentences.append("§")
             all_sentences.append(para)
             continue
+
+        # 检测是否为列表项
+        if _LIST_PATTERN.match(para):
+            list_buffer.append(para)
+            continue
+        else:
+            # 非列表项，先输出缓存的列表项
+            if list_buffer:
+                all_sentences.append("⟨LIST⟩" + " || ".join(list_buffer))
+                list_buffer = []
 
         # 句子分词：按 .!? 后跟空格或换行
         sents = re.split(r'(?<=[.!?])\s+', para)
         sents = [s.strip() for s in sents if s.strip()]
         all_sentences.extend(sents)
-        all_sentences.append("¶")  # 段落边界
+        all_sentences.append("¶")
+
+    # 末尾可能残留的列表项
+    if list_buffer:
+        all_sentences.append("⟨LIST⟩" + " || ".join(list_buffer))
 
     return all_sentences
 
@@ -126,13 +151,18 @@ def _greedy_pack(
                 curr_tokens = 0
             continue
 
-        # 单句就爆 max → 从句切割
+        # 单句就爆 max → 检查是否含占位符，若是则允许超出
         if tokens > max_single:
             if current:
                 chunks.append(current)
                 current = []
                 curr_tokens = 0
-            # 从句切割
+            # 含占位符的句子（代码块/公式等）不切割，整体保留
+            if "⟨" in text and "⟩" in text:
+                current.append(i)
+                curr_tokens = tokens
+                continue
+            # 普通超长句 → 从句切割
             sub_chunks = _split_long_sentence(i, text, max_single)
             chunks.extend(sub_chunks)
             continue

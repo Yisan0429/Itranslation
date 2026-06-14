@@ -25,9 +25,11 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from config import load_config, save_config, DEFAULT_CONFIG, calc_cost
+from api_client import call_api
 from extractor import extract_book
 from kg_builder import build_knowledge_graph, kg_to_glossary
 from chunker import chunk_text, parse_structure
+from format_protector import protect, restore, has_protected_content
 from vector_store import TranslationVectorStore
 from consistency import ConsistencyModel, generate_consistency_report
 from translator import translate_chapter
@@ -95,6 +97,9 @@ def main():
     book_md = extract_book(str(book_path), use_vision=use_vision)
     console.print(f"  提取: {len(book_md)} 字符")
 
+    # 格式保护：替换代码块/公式/URL等为占位符
+    book_md, placeholders = protect(book_md)
+
     # 解析章节结构
     chapters = parse_structure(book_md)
     console.print(f"  章节: {len(chapters)} 章")
@@ -105,7 +110,13 @@ def main():
 
     if not args.no_preread and cfg.get("enable_agentic_preread", True):
         def llm_for_kg(system_prompt, user_prompt):
-            return _make_llm_call(cfg, system_prompt, user_prompt, max_tokens=4096)
+            return call_api(
+                api_key=cfg.get("api_key", ""),
+                api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
+                model=cfg.get("model", "deepseek-v4-pro"),
+                system_prompt=system_prompt, user_prompt=user_prompt,
+                max_tokens=4096,
+            )
 
         kg = build_knowledge_graph(
             book_md,
@@ -178,8 +189,13 @@ def main():
 
     # LLM 调用函数
     def llm_translate(system_prompt, user_prompt):
-        return _make_llm_call(cfg, system_prompt, user_prompt,
-                              max_tokens=cfg.get("max_tokens_per_chunk", 4096))
+        return call_api(
+            api_key=cfg.get("api_key", ""),
+            api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
+            model=cfg.get("model", "deepseek-v4-pro"),
+            system_prompt=system_prompt, user_prompt=user_prompt,
+            max_tokens=cfg.get("max_tokens_per_chunk", 4096),
+        )
 
     all_chapter_translations = []
 
@@ -194,8 +210,13 @@ def main():
             cm = ConsistencyModel()
             checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
             def llm_call(sp, up):
-                return _make_llm_call(cfg, sp, up,
-                                      max_tokens=cfg.get("max_tokens_per_chunk", 4096))
+                return call_api(
+                    api_key=cfg.get("api_key", ""),
+                    api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
+                    model=cfg.get("model", "deepseek-v4-pro"),
+                    system_prompt=sp, user_prompt=up,
+                    max_tokens=cfg.get("max_tokens_per_chunk", 4096),
+                )
             trans = translate_chapter(
                 chapter_title=title, chunks=chunks,
                 vector_store=vector_store if not args.no_rat else None,
@@ -273,28 +294,18 @@ def main():
             chunks, translations,
             strategy=cfg.get("assembly_strategy", "first_lock"),
         )
+        # 还原格式占位符
+        full_text = restore(full_text, placeholders, verbose=False)
         full_translations.append((title, full_text))
+
+    # 最后统一报告还原状态
+    if placeholders:
+        console.print(f"[green]✅ 格式还原完成 ({len(placeholders)} 个占位符)[/green]")
 
     assemble_book(full_translations, output_path, fmt=args.format)
 
     # === 完成 ===
     _print_summary(cfg, len(chapters), total_chunks, len(issues), output_path, start_time)
-
-
-def _make_llm_call(cfg: dict, system_prompt: str, user_prompt: str, max_tokens: int = 4096) -> tuple[str, dict]:
-    """通过 api_client 封装调用 LLM API（内置重试）。"""
-    return call_api(
-        api_key=cfg.get("api_key") or cfg.get("DEEPSEEK_API_KEY", ""),
-        api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
-        model=cfg.get("model", "deepseek-v4-pro"),
-        system_prompt=system_prompt,
-        user_prompt=user_prompt,
-        max_tokens=max_tokens,
-        temperature=cfg.get("temperature", 0.3),
-        max_retries=cfg.get("max_retries", 3),
-        retry_base_delay=cfg.get("retry_base_delay", 2),
-        retry_max_delay=cfg.get("retry_max_delay", 30),
-    )
 
 
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):

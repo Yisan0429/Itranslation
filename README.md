@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.1.4-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
@@ -17,7 +17,7 @@
   Sentence-Level Chunking · Overlap Redundancy · Consistency Audit · Checkpoint/Resume · Cost Tracking
 </p>
 
-> **Note:** The desktop GUI is temporarily unavailable in v1.1.4 while tkinter threading issues are being resolved. This release is CLI-only. The previous GUI code is preserved in `.archive/`.
+> **⚠️ 项目尚不成熟。** 建议先用短文本（< 3000 词）测试，确认翻译质量与费用符合预期后再处理大文件。翻译中途可能因网络波动或 API 异常中断，避免无效花费。
 
 ---
 
@@ -73,11 +73,11 @@ uv sync --extra rat
 ### Launch
 
 ```bash
-# Basic translation
-uv run python translate_book.py book.pdf --genre literature --format pdf
+# Desktop GUI
+uv run python desktop.py
 
-# Full pipeline with parallel translation
-uv run python translate_book.py book.pdf --genre philosophy --parallel 4 --format pdf
+# Command line
+uv run python translate_book.py book.pdf --genre literature --format pdf
 ```
 
 ---
@@ -170,7 +170,7 @@ Based on DeepSeek V4 Pro pricing and measured throughput:
 | Novel | 100,000 | ~150K in / 140K out | ~7 min | ~$0.20 (¥1.44) |
 | Epic | 300,000 | ~450K in / 420K out | ~20 min | ~$0.60 (¥4.32) |
 
-Measured: 1,196-word literary excerpt → 2 chunks → $0.0076 (¥0.06) in 10 seconds.
+Measured: 1,196-word literary excerpt → 2 chunks → $0.0076 (¥0.06) .
 
 Cost calculation is automatic for DeepSeek models. Custom models display token counts without a monetary estimate to prevent misleading figures.
 
@@ -248,7 +248,7 @@ Itranslation/
 | Terminology Consistency | ✓ (real-time audit) | Partial | — | — | — |
 | Genre Adaptation | ✓ (5 presets) | Partial | — | Partial | — |
 | Knowledge Graph Pre-Read | ✓ | — | — | — | — |
-| RAG-Augmented Translation | ✓ (ChromaDB) | — | — | — | — |
+| RAT-Augmented Translation | ✓ (ChromaDB) | — | — | — | — |
 | Cost Tracking | ✓ ($/¥ real-time) | — | — | — | ✓ |
 | Bilingual Output | — | ✓ | — | — | ✓ |
 | Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | EPUB |
