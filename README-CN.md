@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.1.4-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.2.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
@@ -17,7 +17,7 @@
   句子级分块 · 重叠冗余 · 术语一致性审计 · 断点续传 · 成本追踪
 </p>
 
-> **说明：** 桌面 GUI 在 v1.1.4 中暂时不可用，等待 tkinter 跨线程问题修复。当前版本为纯 CLI。之前的 GUI 代码保留在 `.archive/` 中。
+> **⚠️ 项目尚不成熟。** 建议先用短文本（< 3000 词）测试，确认翻译质量与费用符合预期后再处理大文件。翻译中途可能因网络波动或 API 异常中断，避免无效花费。
 
 ---
 
@@ -73,11 +73,11 @@ uv sync --extra rat
 ### 启动
 
 ```bash
-# 基础翻译
-uv run python translate_book.py book.pdf --genre literature --format pdf
+# 桌面 GUI
+uv run python desktop.py
 
-# 完整管线 + 并行翻译
-uv run python translate_book.py book.pdf --genre philosophy --parallel 4 --format pdf
+# 命令行
+uv run python translate_book.py book.pdf --genre literature --format pdf
 ```
 
 ---
@@ -248,7 +248,7 @@ Itranslation/
 | 术语一致性 | ✓（实时审计） | 部分支持 | — | — | — |
 | 体裁适配 | ✓（5 种预设） | 部分支持 | — | 部分支持 | — |
 | 知识图谱预读 | ✓ | — | — | — | — |
-| RAG 增强翻译 | ✓（ChromaDB） | — | — | — | — |
+| RAT 增强翻译 | ✓（ChromaDB） | — | — | — | — |
 | 成本追踪 | ✓（$/¥ 实时） | — | — | — | ✓ |
 | 双语输出 | — | ✓ | — | — | ✓ |
 | 输出格式 | TXT / MD / PDF / EPUB | 双语 EPUB / TXT | 20 种 | EPUB / TXT | EPUB |

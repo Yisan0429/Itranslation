@@ -1,6 +1,6 @@
 [project]
 name = "Itranslation"
-version = "1.1.4"
+version = "1.2.0"
 description = "AI 全书翻译 — PDF/EPUB/TXT/Markdown → 中文"
 requires-python = ">=3.11"
 dependencies = [
@@ -10,6 +10,8 @@ dependencies = [
     "fpdf2>=2.8",
     "ebooklib>=0.20",
     "beautifulsoup4>=4.15",
+    "nicegui>=3.13.0",
+    "pywebview>=6.2.1",
 ]
 
 [project.optional-dependencies]

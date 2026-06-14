@@ -35,3 +35,6 @@ consistency_model.json
 # OS
 Thumbs.db
 .DS_Store
+
+# docs
+docs/
