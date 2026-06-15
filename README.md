@@ -10,7 +10,8 @@ books/
 ├── philosophy/        # 哲学
 ├── natural-science/   # 自然科学
 ├── social-science/    # 社会科学
-└── technical/         # 技术文档
+├── technical/         # 技术文档
+└── others/            # 其他
 ```
 
 ## 贡献方式
