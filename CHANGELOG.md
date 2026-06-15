@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.3.1 (2026-06-15)
+## v1.3.2 (2026-06-15)
 
 ### 🚀 新增
 - **稳定性加固** — 单块 API 失败不再崩溃全流程
@@ -23,12 +23,20 @@
 
 ### 🔧 改进
 - GUI 日志区分 ✅ 完成 / ⚠️ 错误，翻译结束后汇总错误块
-- GUI Provider 下拉改为平台名：DeepSeek / OpenAI / Anthropic / Google / Mimo / Custom
-- 模型版本全面更新：GPT-4o→GPT-5.5、Claude Sonnet 4→Opus 4.8、Gemini 2.5→3.5、Mimo V1→V2.5
-- 删除 Groq/Qwen 支持，删除成本估算和已知不足章节
-- README 格式化清理：删除所有 bold 版本标签、EN 版去中文、TBL→TranslateBooksWithLLMs
 - 新增 PyInstaller 构建配置 `Itranslation-cli.spec`，产出 76MB Windows exe
 - `.gitignore` 添加 dist/ 和 *.zip 防护
+
+## v1.3.1 (2026-06-15)
+
+### 🚀 新增
+- **模型全面更新** — GPT-4o→GPT-5.5、Claude Sonnet 4→Opus 4.8/Sonnet 4.6/Fable 5、Gemini 2.5→3.5、Mimo V1→MiMo V2.5
+- **Mimo 平台支持** — MiMo-V2.5-Pro / MiMo-V2.5-Omni 加入翻译模型表
+
+### 🔧 改进
+- GUI Provider 下拉改为平台名：DeepSeek / OpenAI / Anthropic / Google / Mimo / Custom
+- 删除 Groq/Qwen 支持，删除成本估算和已知不足章节
+- README 中英双版全面清理：去 bold 版本标签、EN 版去中文、TBL→TranslateBooksWithLLMs 全称
+- 竞品对比表新增 Translation Agent、TranslateBooksWithLLMs，删除 Immersive Translate 和 epub-translator
 
 ## v1.3.0 (2026-06-15)
 
