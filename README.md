@@ -303,12 +303,6 @@ This reports whether Marker and RAT optional features are fully installed and re
 
 ---
 
-## License
-
-MIT © 2026
-
----
-
 ## Acknowledgments
 
 Itranslation builds on ideas and inspiration from the following projects, studied across multiple development sessions:
@@ -331,3 +325,9 @@ Itranslation builds on ideas and inspiration from the following projects, studie
 | [liteLLM](https://github.com/BerriAI/litellm) | Unified API interface across 100+ LLM providers (v1.3.0) |
 | [NiceGUI](https://github.com/zauberzeug/nicegui) | Desktop GUI framework with browser and native window modes (v1.2.0) |
 | [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Standalone Windows executable packaging (v1.3.1) |
+
+---
+
+## License
+
+MIT © 2026

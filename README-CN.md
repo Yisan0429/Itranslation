@@ -303,12 +303,6 @@ uv run python src/env_check.py
 
 ---
 
-## License
-
-MIT © 2026
-
----
-
 ## 致谢
 
 Itranslation 的设计和实现受以下项目的启发，这些项目在多个开发阶段中被深入研究：
@@ -331,3 +325,9 @@ Itranslation 的设计和实现受以下项目的启发，这些项目在多个�
 | [liteLLM](https://github.com/BerriAI/litellm) | 100+ LLM 提供商统一 API 接口（v1.3.0） |
 | [NiceGUI](https://github.com/zauberzeug/nicegui) | 桌面 GUI 框架（浏览器 + 原生窗口）（v1.2.0） |
 | [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Windows 独立可执行文件打包（v1.3.1） |
+
+---
+
+## License
+
+MIT © 2026
