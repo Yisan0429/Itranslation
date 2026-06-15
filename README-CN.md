@@ -246,7 +246,7 @@ Itranslation/
 
 ### 功能维度对比
 
-| 维度 | Itranslation | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | Translation Agent | TBL |
+| 维度 | Itranslation | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
 | 桌面 GUI | ✓（NiceGUI） | — | ✓（需 Calibre） | — | — | ✓（Web） |
 | 断点续传 | ✓ | ✓ | ✓ | ✓ | — | ✓ |

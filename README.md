@@ -246,7 +246,7 @@ Itranslation/
 
 ### Feature Comparison
 
-| Dimension | Itranslation | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | Translation Agent | TBL |
+| Dimension | Itranslation | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
 | Desktop GUI | ✓ (NiceGUI) | — | ✓ (via Calibre) | — | — | ✓ (Web) |
 | Checkpoint/Resume | ✓ | ✓ | ✓ | ✓ | — | ✓ |

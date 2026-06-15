@@ -536,6 +536,7 @@ def _run_translation_pipeline():
     from translator import translate_chapter as do_chapter
 
     all_translations = []
+    all_errors = []
     done_chunks = 0
 
     if actual_parallel > 1 and len(all_chapter_chunks) > 1:
@@ -559,12 +560,16 @@ def _run_translation_pipeline():
                     pool.shutdown(wait=False, cancel_futures=True)
                     return
                 title = futures[fut]
-                trans = fut.result()
+                trans, errs = fut.result()
                 all_translations.append((title, all_chapter_chunks[0][1], trans))
+                all_errors.extend(errs)
                 done_chunks += len(trans)
                 state["progress"] = 0.10 + 0.75 * (done_chunks / max(total_chunks, 1))
                 state["current_chapter"] = f"翻译中: {title} ({done_chunks}/{total_chunks})"
-                _log(f"✅ {title}: {len(trans)} 块")
+                if errs:
+                    _log(f"⚠️ {title}: {len(trans)} 块, {len(errs)} 错误")
+                else:
+                    _log(f"✅ {title}: {len(trans)} 块")
 
                 cost = cfg_local.get("_cost", {})
                 pt = cost.get("prompt_tokens", 0)
@@ -577,7 +582,7 @@ def _run_translation_pipeline():
             if state["cancel_flag"]:
                 return
             checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
-            trans = do_chapter(
+            trans, errs = do_chapter(
                 chapter_title=title, chunks=chunks_list,
                 vector_store=vector_store,
                 consistency_model=consistency_model, glossary=glossary, kg=kg,
@@ -585,9 +590,14 @@ def _run_translation_pipeline():
                 checkpoint_path=checkpoint_path, cost_lock=cost_lock,
             )
             all_translations.append((title, chunks_list, trans))
+            all_errors.extend(errs)
             done_chunks += len(trans)
             state["progress"] = 0.10 + 0.75 * (done_chunks / max(total_chunks, 1))
             state["current_chapter"] = f"翻译中: {title} ({done_chunks}/{total_chunks})"
+            if errs:
+                _log(f"⚠️ {title}: {len(errs)} 个块失败")
+            else:
+                _log(f"✅ {title}: {len(trans)} 块")
 
             cost = cfg_local.get("_cost", {})
             pt = cost.get("prompt_tokens", 0)
@@ -595,6 +605,12 @@ def _run_translation_pipeline():
             cost_val, _ = calc_cost(cfg_local["model"], pt, ct)
             state["cost_dollars"] = cost_val
             state["elapsed_sec"] = time.time() - start_time
+
+    # 错误汇总
+    if all_errors:
+        _log(f"❌ 翻译错误: {len(all_errors)} 个块")
+        for e in all_errors[:5]:
+            _log(f"   {e['chapter']}/{e['chunk_id']}: {e['error'][:80]}")
 
     # Phase 4: 组装 + 还原
     state["current_chapter"] = "Phase 4: 组装输出..."

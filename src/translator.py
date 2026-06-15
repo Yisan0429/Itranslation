@@ -61,7 +61,12 @@ def translate_chapter(
     config: dict,
     checkpoint_path: str = None,
     cost_lock: threading.Lock = None,
-) -> list[str]:
+) -> tuple[list[str], list[dict]]:
+    """翻译一个章节的所有块。
+
+    Returns:
+        (translations, errors) — errors 列表每项含 {chunk_id, error, stage}
+    """
     console.print(f"\n[bold]📖 翻译章节: {chapter_title} ({len(chunks)} 块)[/bold]")
 
     if vector_store is not None:
@@ -81,6 +86,7 @@ def translate_chapter(
     reflection_depth = config.get("reflection_depth", 1)
 
     translations = []
+    errors = []
 
     for i, chunk in enumerate(chunks):
         if chunk.id in done_ids:
@@ -90,69 +96,95 @@ def translate_chapter(
                 console.print(f"  [{i+1}/{len(chunks)}] ⏭️ 跳过（已翻译）")
                 continue
 
-        # 1. RAT 检索
-        rat_context = _build_rat_context(chunk, vector_store, glossary, kg, config)
+        try:
+            # 1. RAT 检索
+            rat_context = _build_rat_context(chunk, vector_store, glossary, kg, config)
 
-        # 2. 构建 prompt
-        system_prompt, user_prompt = _build_translation_prompt(
-            chunk, rat_context, glossary, kg, config
-        )
-
-        # 3. 调用 LLM 翻译（可能含 reflection）
-        if enable_reflection:
-            result, usage = _translate_with_reflection(
-                llm_call, system_prompt, user_prompt, chunk,
-                config, reflection_depth, cost_lock,
-            )
-        else:
-            result, usage = _call_with_retry(
-                llm_call, system_prompt, user_prompt, chunk.id, config
+            # 2. 构建 prompt
+            system_prompt, user_prompt = _build_translation_prompt(
+                chunk, rat_context, glossary, kg, config
             )
 
-        # 累加成本（线程安全）
-        if cost_lock:
-            with cost_lock:
+            # 3. 调用 LLM 翻译（可能含 reflection）
+            if enable_reflection:
+                result, usage = _translate_with_reflection(
+                    llm_call, system_prompt, user_prompt, chunk,
+                    config, reflection_depth, cost_lock,
+                )
+            else:
+                result, usage = _call_with_retry(
+                    llm_call, system_prompt, user_prompt, chunk.id, config
+                )
+
+            # 累加成本（线程安全）
+            if cost_lock:
+                with cost_lock:
+                    _accumulate_cost(config, usage)
+            else:
                 _accumulate_cost(config, usage)
-        else:
-            _accumulate_cost(config, usage)
 
-        # 4. 存储到向量库
-        if vector_store is not None:
-            vector_store.add_translation(
-                para_id=f"{chapter_title}_{chunk.id}",
-                source=chunk.text,
-                target=result,
-            )
+            # 4. 存储到向量库
+            if vector_store is not None:
+                try:
+                    vector_store.add_translation(
+                        para_id=f"{chapter_title}_{chunk.id}",
+                        source=chunk.text,
+                        target=result,
+                    )
+                except Exception as e:
+                    console.print(f"  [dim]⚠️ 向量库写入失败 (非致命): {e}[/dim]")
 
-        # 5. 更新一致性模型
-        _update_consistency(chunk.text, result, glossary, consistency_model, chunk.id)
+            # 5. 更新一致性模型
+            _update_consistency(chunk.text, result, glossary, consistency_model, chunk.id)
 
-        translations.append(result)
+            translations.append(result)
 
-        # 6. 保存 checkpoint
-        if checkpoint_path:
-            _save_checkpoint(
-                checkpoint_path,
-                {ch.id: t for ch, t in zip(chunks[:len(translations)], translations)},
-                chapter_title,
-                len(translations),
-                len(chunks),
-                content_hash,
-            )
+            # 6. 保存 checkpoint
+            if checkpoint_path:
+                _save_checkpoint(
+                    checkpoint_path,
+                    {ch.id: t for ch, t in zip(chunks[:len(translations)], translations)},
+                    chapter_title,
+                    len(translations),
+                    len(chunks),
+                    content_hash,
+                )
 
-        # 7. 每 N 块审计
-        interval = config.get("consistency_check_interval", 20)
-        if (i + 1) % interval == 0:
-            issues = consistency_model.audit_all()
-            if issues:
-                console.print(f"  [yellow]⚠️ 一致性审计: {len(issues)} 个术语漂移[/yellow]")
-                for iss in issues[:3]:
-                    console.print(f"     {iss['term']}: {iss['consistency']:.0%} → 建议 '{iss['dominant']}'")
+            # 7. 每 N 块审计
+            interval = config.get("consistency_check_interval", 20)
+            if (i + 1) % interval == 0:
+                issues = consistency_model.audit_all()
+                if issues:
+                    console.print(f"  [yellow]⚠️ 一致性审计: {len(issues)} 个术语漂移[/yellow]")
+                    for iss in issues[:3]:
+                        console.print(f"     {iss['term']}: {iss['consistency']:.0%} → 建议 '{iss['dominant']}'")
 
-        tag = "🔄" if enable_reflection else "✅"
-        console.print(f"  [{i+1}/{len(chunks)}] {tag} {chunk.id}")
+            tag = "🔄" if enable_reflection else "✅"
+            console.print(f"  [{i+1}/{len(chunks)}] {tag} {chunk.id}")
 
-    return translations
+        except Exception as e:
+            error_msg = str(e)[:200]
+            console.print(f"  [{i+1}/{len(chunks)}] [red]✗ {chunk.id}: {error_msg}[/red]")
+            errors.append({
+                "chunk_id": chunk.id,
+                "chapter": chapter_title,
+                "error": error_msg,
+                "stage": "translate",
+            })
+            # 填充占位，保持索引对齐
+            translations.append(f"[翻译失败: {error_msg[:80]}]")
+            # 仍然保存 checkpoint（跳过坏块）
+            if checkpoint_path:
+                _save_checkpoint(
+                    checkpoint_path,
+                    {ch.id: t for ch, t in zip(chunks[:len(translations)], translations)},
+                    chapter_title,
+                    len(translations),
+                    len(chunks),
+                    content_hash,
+                )
+
+    return translations, errors
 
 
 def _translate_with_reflection(
