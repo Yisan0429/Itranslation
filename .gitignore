@@ -41,3 +41,5 @@ docs/dist/
 build/
 *.spec
 !Itranslation-cli.spec
+dist/
+Itranslation-*.zip

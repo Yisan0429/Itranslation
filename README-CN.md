@@ -17,7 +17,7 @@
   句子级分块 · 重叠冗余 · RAT · KG 预读 · Reflection · 术语一致性审计 · 断点续传 · 成本追踪
 </p>
 
-> **⚠️ 项目尚不成熟。** 建议先用短文本（< 3000 词）测试，确认翻译质量与费用符合预期后再处理大文件。翻译中途可能因网络波动或 API 异常中断，避免无效花费。
+> 项目尚在积极开发中。建议先用短文本（< 3000 词）测试，确认翻译质量与费用符合预期后再处理大文件。翻译中途可能因网络波动或 API 异常中断。
 
 ---
 
@@ -34,10 +34,10 @@ Itranslation 是一个基于大语言模型的桌面翻译应用，支持将整�
 | 分块方式 | 每 N 行硬性切割 | 句子级分词 + 可配置重叠 |
 | 术语一致性 | 依赖 LLM 跨调用记忆 | 增量追踪模型，自动检测术语漂移 |
 | 翻译质量 | 单次翻译，无验证机制 | 重叠冗余 + RAT + KG 预读 + 可配置间隔的实时审计 |
-| 译后 QA | 直接输出 | **Reflection 反思工作流**：LLM 自审 → 修订（翻译 → 反思 → 改进） |
+| 译后 QA | 直接输出 | Reflection 反思工作流：LLM 自审 → 修订（翻译 → 反思 → 改进） |
 | 中断处理 | 重新开始 | GUI 暂停/恢复；CLI 与 GUI 均支持断点续传 |
 | 成本可见性 | 结算时才知道 | 每块翻译后实时显示 token 消耗和费用（$/¥） |
-| 模型灵活性 | 硬编码单一服务商 | 5 大平台模型，liteLLM 集成（DeepSeek、OpenAI、Anthropic、Google、Mimo）+ 自定义 API |
+| 模型灵活性 | 硬编码单一服务商 | 5 大平台 via liteLLM（DeepSeek、OpenAI、Anthropic、Google、Mimo）+ 自定义 API |
 | 质量基准测试 | 无 | 内置 BLEU/chrF 评分 + LLM-as-Judge 评估套件 |
 
 ---
@@ -46,9 +46,9 @@ Itranslation 是一个基于大语言模型的桌面翻译应用，支持将整�
 
 ### 前提条件
 
-- **Python 3.11** 及以上 — [python.org](https://www.python.org/downloads/)
-- **uv** 包管理器 — `pip install uv`
-- **DeepSeek API Key** — [platform.deepseek.com](https://platform.deepseek.com/)（免费注册）
+- Python 3.11 及以上 — [python.org](https://www.python.org/downloads/)
+- uv 包管理器 — `pip install uv`
+- DeepSeek API Key — [platform.deepseek.com](https://platform.deepseek.com/)（免费注册）
 
 ### 安装步骤
 
@@ -88,10 +88,10 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 
 | 格式 | 提取引擎 | 精度 | 说明 |
 |---|---|---|---|
-| **PDF** | PyMuPDF（默认） | 60–70% | 适用于标准单栏排版 |
-| **PDF** | Marker（可选） | 90%+ | 多栏、表格等复杂排版；需下载模型 |
-| **EPUB** | ebooklib | ~99% | 保留章节结构 |
-| **TXT / MD** | 直接读取 | 100% | 无提取损耗 |
+| PDF | PyMuPDF（默认） | 60–70% | 适用于标准单栏排版 |
+| PDF | Marker（可选） | 90%+ | 多栏、表格等复杂排版；需下载模型 |
+| EPUB | ebooklib | ~99% | 保留章节结构 |
+| TXT / MD | 直接读取 | 100% | 无提取损耗 |
 
 ### 体裁适配
 
@@ -105,14 +105,12 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 
 ### 输出格式
 
-- **TXT** — 纯文本，体积最小
-- **MD** — Markdown，保留标题层级和段落结构
-- **PDF** — 排版输出，自动嵌入平台对应的 CJK 中文字体
-- **EPUB** — 标准电子书格式，含章节目录导航
+- TXT — 纯文本，体积最小
+- MD — Markdown，保留标题层级和段落结构
+- PDF — 排版输出，自动嵌入平台对应的 CJK 中文字体
+- EPUB — 标准电子书格式，含章节目录导航
 
 ### 翻译模型
-
-通过 liteLLM 集成支持多平台模型，以及自定义 OpenAI 兼容 API。
 
 | 平台 | 模型 | 输入价格 | 输出价格 | 适用场景 |
 |---|---|---|---|---|
@@ -120,24 +118,24 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 | OpenAI | GPT-5.5 / GPT-5.5 Mini | $1.50–5.00 | $6.00–15.00 | 通用质量最高 |
 | Anthropic | Opus 4.8 / Sonnet 4.6 / Fable 5 | $3.00–10.00 | $15.00–50.00 | 文学翻译见长；复杂推理 |
 | Google | Gemini 3.5 Pro / 3.5 Flash | $0.30–3.50 | $1.50–10.50 | 长文档处理；速度优先 |
-| Mimo | MiMo V2.5 Pro / V2.5 Omni | $0.40–1.20 | $1.60–4.80 | 多模态理解 |
+| Mimo | MiMo-V2.5-Pro / MiMo-V2.5-Omni | $0.40–1.20 | $1.60–4.80 | 多模态理解 |
 | 自定义 | — | — | — | 任何 OpenAI 兼容 API |
 
 ### Reflection 反思工作流
 
-启用后，每个翻译块将经过额外的质量循环：
+启用后每个翻译块将经过额外的质量循环：
 
-1. **翻译** — LLM 初始翻译
-2. **反思** — LLM 对照原文审查译文，识别准确性、流畅性、术语和风格方面的问题
-3. **修订** — LLM 根据反思反馈重新翻译
+1. 翻译 — LLM 初始翻译
+2. 反思 — LLM 对照原文审查译文，识别准确性、流畅性、术语和风格方面的问题
+3. 修订 — LLM 根据反思反馈重新翻译
 
 这会增加约 2 倍的 token 消耗，但显著提升翻译质量，尤其适用于文学和哲学类文本。CLI 通过 `--reflect` 启用，GUI 通过 Reflection 开关控制。
 
-### 并行翻译（v1.1）
+### 并行翻译
 
 章节级并行翻译，使用可配置的线程池。默认 4 个工作线程；可在 config 中设置 `parallel_workers: 0` 禁用，或通过 CLI `--parallel 0` 关闭。
 
-### 断点续传（v1.1）
+### 断点续传
 
 GUI 和 CLI 均在每章翻译完成后持久化进度。若翻译因网络中断、程序崩溃或用户取消而中止，重新启动同一文件时会弹窗询问是否从断点继续，并显示已完成章节列表。
 
@@ -154,8 +152,8 @@ GUI 和 CLI 均在每章翻译完成后持久化进度。若翻译因网络中�
   ├─ Phase 1: 语义分块
   │   └─ 句子级分词 → 贪心打包 → 块间重叠（3–4 句）
   │
-  ├─ Phase 2: 并行翻译 + [Reflection]
-  │   └─ 逐块：术语注入 + 上下文 → LLM 调用 → [反思 → 修订] → 向量库存储
+  ├─ Phase 2: 并行翻译 + Reflection
+  │   └─ 逐块：术语注入 + 上下文 → LLM 调用 → 反思 → 修订 → 向量库存储
   │
   ├─ Phase 3: 质量审计
   │   └─ 一致性模型：每 N 块审计；术语一致性 < 80% 触发告警
@@ -166,11 +164,11 @@ GUI 和 CLI 均在每章翻译完成后持久化进度。若翻译因网络中�
 
 ### 核心设计
 
-**句子级分块。** 输入文本先按句子拆分，再按可配置的 token 大小贪心打包。相邻块之间重叠 3–4 个句子。组装时，每句话仅保留首次出现的译文，后续重复版本丢弃。此举以约 5% 的 token 开销换取冗余纠错能力。
+句子级分块。输入文本先按句子拆分，再按可配置的 token 大小贪心打包。相邻块之间重叠 3–4 个句子。组装时，每句话仅保留首次出现的译文，后续重复版本丢弃。此举以约 5% 的 token 开销换取冗余纠错能力。
 
-**增量一致性模型。** 每条术语翻译均记录原文词、译法和出处位置。每 20 块（可配置）自动审计全部术语，若某术语主译法占比低于 80% 阈值即触发告警，同时报告漂移术语和建议的统一译法。
+增量一致性模型。每条术语翻译均记录原文词、译法和出处位置。每 20 块（可配置）自动审计全部术语，若某术语主译法占比低于 80% 阈值即触发告警，同时报告漂移术语和建议的统一译法。
 
-**检索增强翻译（RAT）。** 已翻译段落通过 `all-MiniLM-L6-v2` 嵌入模型存入 ChromaDB 向量库。翻译新块时，系统检索语义最相近的历史翻译，作为参考上下文注入 LLM 提示词。
+检索增强翻译（RAT）。已翻译段落通过 `all-MiniLM-L6-v2` 嵌入模型存入 ChromaDB 向量库。翻译新块时，系统检索语义最相近的历史翻译，作为参考上下文注入 LLM 提示词。
 
 ---
 
@@ -194,10 +192,10 @@ uv run python translate_book.py book.pdf \
   --parallel 4 \
   --output final/translation
 
-# 使用 GPT-4o（liteLLM） + Reflection
+# 使用 GPT-5.5（liteLLM） + Reflection
 uv run python translate_book.py book.pdf \
   --provider litellm \
-  --model openai/gpt-4o \
+  --model openai/gpt-5.5 \
   --reflect \
   --format pdf
 ```
@@ -209,6 +207,8 @@ uv run python translate_book.py book.pdf \
 ```
 Itranslation/
 ├── translate_book.py     CLI 入口
+├── desktop.py            NiceGUI 桌面应用
+├── Itranslation-cli.spec PyInstaller 构建配置
 ├── src/
 │   ├── extractor.py      PDF/EPUB/TXT/MD 文本提取
 │   ├── kg_builder.py     Agentic 预读与知识图谱构建
@@ -218,7 +218,7 @@ Itranslation/
 │   ├── assembler.py      去重叠组装 + TXT/MD/PDF/EPUB 输出
 │   ├── vector_store.py   ChromaDB 向量存储
 │   ├── format_protector.py  代码/公式/URL 占位符保护
-│   ├── api_client.py     统一 API 客户端（HTTP + liteLLM，5 平台）
+│   ├── api_client.py     统一 API 客户端（HTTP + liteLLM）
 │   ├── benchmark.py       BLEU/chrF + LLM-as-Judge 质量评估
 │   ├── config.py         全局配置（DEFAULT_CONFIG + config.json）
 │   ├── env_check.py      可选功能就绪检测器
@@ -246,52 +246,52 @@ Itranslation/
 
 ### 功能维度对比
 
-| 维度 | Itranslation v1.3 | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
+| 维度 | Itranslation | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | Translation Agent | TBL |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
 | 桌面 GUI | ✓（NiceGUI） | — | ✓（需 Calibre） | — | — | ✓（Web） |
-| 断点续传 | ✓（CLI+GUI） | ✓ | ✓ | ✓ | — | ✓ |
-| 并行翻译 | ✓（章节级） | ✓（API 批量） | ✓（多书并行） | — | — | ✓ |
+| 断点续传 | ✓ | ✓ | ✓ | ✓ | — | ✓ |
+| 并行翻译 | ✓ | ✓（API 批量） | ✓（多书并行） | — | — | ✓ |
 | 句子级分块 | ✓ | — | — | — | — | — |
 | 重叠冗余 | ✓ | — | — | — | — | — |
-| 术语一致性 | ✓（实时审计） | 部分支持 | — | — | — | — |
+| 术语一致性 | ✓ | 部分支持 | — | — | — | — |
 | 体裁适配 | ✓（5 种预设） | 部分支持 | — | 部分支持 | — | — |
 | 知识图谱预读 | ✓ | — | — | — | — | — |
 | RAT 增强翻译 | ✓（ChromaDB） | — | — | — | — | — |
-| **Reflection 工作流** | **✓（v1.3）** | — | — | — | ✓ | — |
-| 格式保护 | ✓（v1.2） | — | — | — | — | — |
-| 成本追踪 | ✓（$/¥ 实时） | — | — | — | — | ✓ |
-| 多平台 liteLLM | **✓（v1.3，5 平台）** | ✓（40+ 模型） | 多引擎 | OpenAI 系列 | OpenAI | 多平台 |
+| Reflection 工作流 | ✓ | — | — | — | ✓ | — |
+| 格式保护 | ✓ | — | — | — | — | — |
+| 成本追踪 | ✓（$/¥） | — | — | — | — | ✓ |
+| 多平台 liteLLM | ✓（5 平台） | ✓（40+ 模型） | 多引擎 | OpenAI 系列 | OpenAI | 多平台 |
 | 双语输出 | — | ✓ | — | — | — | — |
-| Benchmark 套件 | **✓（v1.3）** | — | — | — | — | ✓ |
+| Benchmark 套件 | ✓ | — | — | — | — | ✓ |
 | 输出格式 | TXT / MD / PDF / EPUB | 双语 EPUB / TXT | 20 种 | EPUB / TXT | TXT | TXT / EPUB / SRT |
-| 模型支持 | DeepSeek + liteLLM | 40+（liteLLM） | 多引擎 | OpenAI 系列 | GPT-5.5 | Ollama/OpenAI/Gemini |
+| 模型支持 | DeepSeek + liteLLM | 40+（liteLLM） | 多引擎 | OpenAI 系列 | GPT-5.5 | Ollama, OpenAI, Gemini |
 | 成熟度 | v1.3（2026） | 5 年 | 3 年 | v2（2025） | 研究阶段（2025） | 活跃（2026） |
 
 ### 差异化优势
 
-1. **最全面的开源翻译质量管线。** 句子级分块、重叠冗余、RAT 检索、KG 预读和实时术语审计形成完整质量闭环，所有竞品均不同时具备。新增的 Reflection 反思工作流融入前沿 Agentic 翻译研究成果，实现翻译→反思→修订循环。
-2. **多平台模型生态。** liteLLM 集成提供 5 大平台（DeepSeek、OpenAI、Anthropic、Google、Mimo）模型的统一接口，同时保留 DeepSeek 直连 HTTP 通道。
-3. **内置质量基准测试。** `benchmark.py` 提供 BLEU/chrF 自动评分和 LLM-as-Judge 四维质量评估。
-4. **成本透明可控。** token 消耗和预估费用（美元/人民币双币种）实时更新。自定义模型明确标注，不显示错误定价。
-5. **API 内置重试。** 所有 LLM API 调用均内置指数退避重试机制（可通过 `config.json` 配置），确保网络波动时的稳定性。
+1. 最全面的开源翻译质量管线。句子级分块、重叠冗余、RAT 检索、KG 预读和实时术语审计形成完整质量闭环，所有竞品均不同时具备。Reflection 反思工作流融入前沿 Agentic 翻译研究成果，实现翻译 → 反思 → 修订循环。
+2. 多平台模型生态。liteLLM 集成提供 5 大平台（DeepSeek、OpenAI、Anthropic、Google、Mimo）模型的统一接口，同时保留 DeepSeek 直连 HTTP 通道。
+3. 内置质量基准测试。benchmark 套件提供 BLEU/chrF 自动评分和 LLM-as-Judge 四维质量评估。
+4. 成本透明可控。token 消耗和预估费用（美元/人民币双币种）实时更新。自定义模型明确标注，不显示错误定价。
+5. API 内置重试。所有 LLM API 调用均内置指数退避重试机制（可通过 config.json 配置），确保网络波动时的稳定性。
 
 ---
 
 ## 常见问题
 
-**翻译中途网络断了怎么办？**
+翻译中途网络断了怎么办？
 
 CLI 在每章完成后保存进度。中断后重新翻译同一文件，系统会自动检测 checkpoint 并询问是否从断点继续。
 
-**扫描版 PDF 能翻译吗？**
+扫描版 PDF 能翻译吗？
 
-可以，使用 Marker 视觉提取引擎。在 GUI 中将 PDF 提取方式选为"marker（视觉，90%+ 精度）"。首次使用会自动下载约 2 GB 模型文件。
+可以，使用 Marker 视觉提取引擎。首次使用会自动下载约 2 GB 模型文件。
 
-**能否使用自己的模型服务？**
+能否使用自己的模型服务？
 
-通过 `--provider`、`--model` 和 `--api-base` 参数配置任何 OpenAI 兼容 API（Ollama、vLLM、Groq 等）。或在 `config.json` 中设置。也可通过 `--provider litellm` 使用 liteLLM 调用 GPT-4o、Claude、Gemini 等。
+通过 `--provider litellm --model <model-id>` 使用 liteLLM，或 `--provider custom --api-base <url>` 配置任何 OpenAI 兼容 API（Ollama、vLLM、Groq 等）。
 
-**如何检测可选功能是否就绪？**
+如何检测可选功能是否就绪？
 
 ```bash
 uv run python src/env_check.py

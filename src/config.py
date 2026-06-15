@@ -166,8 +166,8 @@ MODEL_PRESETS = [
     {"provider_label": "Google", "provider": "litellm", "model": "gemini/gemini-3.5-pro", "label": "Gemini 3.5 Pro"},
     {"provider_label": "Google", "provider": "litellm", "model": "gemini/gemini-3.5-flash", "label": "Gemini 3.5 Flash"},
     # Mimo（via liteLLM）
-    {"provider_label": "Mimo", "provider": "litellm", "model": "mimo/mimo-v2.5-pro", "label": "V2.5 Pro"},
-    {"provider_label": "Mimo", "provider": "litellm", "model": "mimo/mimo-v2.5-omni", "label": "V2.5 Omni"},
+    {"provider_label": "Mimo", "provider": "litellm", "model": "mimo/mimo-v2.5-pro", "label": "MiMo-V2.5-Pro"},
+    {"provider_label": "Mimo", "provider": "litellm", "model": "mimo/mimo-v2.5-omni", "label": "MiMo-V2.5-Omni"},
     # Custom
     {"provider_label": "Custom", "provider": "custom", "model": "", "label": "自定义 API..."},
 ]
