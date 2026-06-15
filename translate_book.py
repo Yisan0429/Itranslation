@@ -329,6 +329,20 @@ def main():
     with open(glossary_path, "w", encoding="utf-8") as f:
         json.dump(final_glossary, f, ensure_ascii=False, indent=2)
 
+    # === Phase 3.5: 低 Token 审计（问题族扫描） ===
+    from auditor import Auditor
+    auditor = Auditor()
+
+    # 对所有已翻译章节做正则扫描
+    for title, chunks, translations in all_chapter_translations:
+        full_text = assemble_translations(chunks, translations, strategy=cfg.get("assembly_strategy", "first_lock"))
+        auditor.scan_chapter(full_text, title)
+
+    if auditor.total_issues > 0:
+        console.print()
+        console.print(auditor.report())
+        console.print(f"  [dim]共 {auditor.total_issues} 处候选，可用 --audit-llm 启动 LLM 深度审查[/dim]")
+
     # === Phase 4: 组装 ===
     console.print("\n[bold cyan]━━━ Phase 4: 组装 — 去重叠 + 输出 ━━━[/bold cyan]")
 

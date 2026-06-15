@@ -612,6 +612,20 @@ def _run_translation_pipeline():
         for e in all_errors[:5]:
             _log(f"   {e['chapter']}/{e['chunk_id']}: {e['error'][:80]}")
 
+    # 低 Token 审计
+    from auditor import Auditor
+    auditor = Auditor()
+    for title, chunks_list, trans in all_translations:
+        full_text = assemble_translations(chunks_list, trans, "first_lock")
+        auditor.scan_chapter(full_text, title)
+    if auditor.total_issues > 0:
+        _log(f"📋 低 Token 审计: {auditor.total_issues} 处候选问题")
+        # 只报告 P1/P2
+        p1p2 = sum(len(v) for k, v in auditor.findings.items()
+                    if auditor._family_severity(k) in ("P1", "P2"))
+        if p1p2 > 0:
+            _log(f"   ⚠️ P1/P2 严重问题: {p1p2} 处，建议审查")
+
     # Phase 4: 组装 + 还原
     state["current_chapter"] = "Phase 4: 组装输出..."
     state["progress"] = 0.88
