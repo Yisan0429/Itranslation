@@ -23,6 +23,6 @@ books/
 
 ## 命名规范
 
-`[作者] 书名 [语言].格式`
+`书名.格式`
 
-例如：`books/natural-science/Charles Darwin On the Origin of Species [EN-CN].pdf`
+例如：`On the Origin of Species.pdf`
