@@ -37,4 +37,7 @@ Thumbs.db
 .DS_Store
 
 # docs
-docs/
+docs/dist/
+build/
+*.spec
+!Itranslation-cli.spec
