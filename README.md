@@ -304,3 +304,28 @@ This reports whether Marker and RAT optional features are fully installed and re
 ## License
 
 MIT © 2026
+
+---
+
+## Acknowledgments
+
+Itranslation builds on ideas and inspiration from the following projects, studied across multiple development sessions:
+
+| Project | What We Learned |
+|:---|:---|
+| [LifeBook](https://github.com/SaberOnGo/public-domain-books-translation) | Defect family classification, low-token audit, per-chapter quality gates, stratified random spot-checking (v1.3.3) |
+| [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | Bilingual EPUB output, sliding-window context as user/assistant pairs, delimiter-based batching, multi-key rotation (v1.0 foundation) |
+| [Translation Agent](https://github.com/andrewyng/translation-agent) | Reflection workflow (translate → reflect → improve), agentic translation architecture (v1.3.0) |
+| [TranslateBooksWithLLMs](https://github.com/hydropix/TranslateBooksWithLLMs) | Pre-built executables, format-preserving EPUB translation, Docker deployment (v1.3.1) |
+| [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | MD5 content cache for re-runs, 48 input / 20 output formats, multi-engine design (v1.0 research) |
+| [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | Multi-format input support, SQLite-based resume caching (v1.0 research) |
+| [pdf-translate](https://github.com/withmargin/pdf-translate) | Page-level isolation for non-narrative texts, layout preservation via content stream manipulation (v1.0 research) |
+| [LibreTranslate](https://github.com/LibreTranslate/LibreTranslate) | Self-hosted API design, Google Translate API format compatibility (v1.0 research) |
+| [Argos Translate](https://github.com/argosopentech/argos-translate) | Offline NMT capability, language-pair model architecture (v1.0 research) |
+| [Opus-MT](https://github.com/Helsinki-NLP/Opus-MT) | Open neural MT models, Marian NMT framework, 1000+ language pairs (v1.0 research) |
+| [EasyNMT](https://github.com/UKPLab/EasyNMT) | Unified interface for multiple MT engines (v1.0 research) |
+| [translate-shell](https://github.com/soimort/translate-shell) | CLI-first translation UX, multi-provider abstraction (v1.0 research) |
+| [sacrebleu](https://github.com/mjpost/sacrebleu) | BLEU and chrF evaluation metrics for Chinese translation (v1.3.0) |
+| [liteLLM](https://github.com/BerriAI/litellm) | Unified API interface across 100+ LLM providers (v1.3.0) |
+| [NiceGUI](https://github.com/zauberzeug/nicegui) | Desktop GUI framework with browser and native window modes (v1.2.0) |
+| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Standalone Windows executable packaging (v1.3.1) |

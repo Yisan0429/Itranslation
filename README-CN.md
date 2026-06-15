@@ -304,3 +304,28 @@ uv run python src/env_check.py
 ## License
 
 MIT © 2026
+
+---
+
+## 致谢
+
+Itranslation 的设计和实现受以下项目的启发，这些项目在多个开发阶段中被深入研究：
+
+| 项目 | 借鉴之处 |
+|:---|:---|
+| [LifeBook](https://github.com/SaberOnGo/public-domain-books-translation) | 问题族分类、低 token 审计、逐章质量门禁、分层随机抽检（v1.3.3） |
+| [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 双语 EPUB 输出、滑动窗口上下文、分隔符批处理、多 Key 轮换（v1.0 基础） |
+| [Translation Agent](https://github.com/andrewyng/translation-agent) | Reflection 反思工作流（翻译→反思→改进）、Agentic 翻译架构（v1.3.0） |
+| [TranslateBooksWithLLMs](https://github.com/hydropix/TranslateBooksWithLLMs) | 预编译可执行文件、格式保留 EPUB 翻译、Docker 部署（v1.3.1） |
+| [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | MD5 内容缓存、48 输入/20 输出格式、多引擎设计（v1.0 研究） |
+| [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 多格式输入支持、SQLite 断点缓存（v1.0 研究） |
+| [pdf-translate](https://github.com/withmargin/pdf-translate) | 非叙事文本逐页隔离、内容流操作保留排版（v1.0 研究） |
+| [LibreTranslate](https://github.com/LibreTranslate/LibreTranslate) | 自托管 API 设计、Google Translate 格式兼容（v1.0 研究） |
+| [Argos Translate](https://github.com/argosopentech/argos-translate) | 离线 NMT 能力、语言对模型架构（v1.0 研究） |
+| [Opus-MT](https://github.com/Helsinki-NLP/Opus-MT) | 开源神经 MT 模型、Marian NMT 框架、1000+ 语言对（v1.0 研究） |
+| [EasyNMT](https://github.com/UKPLab/EasyNMT) | 多 MT 引擎统一接口（v1.0 研究） |
+| [translate-shell](https://github.com/soimort/translate-shell) | CLI 优先翻译体验、多提供商抽象（v1.0 研究） |
+| [sacrebleu](https://github.com/mjpost/sacrebleu) | 中文翻译 BLEU/chrF 评估指标（v1.3.0） |
+| [liteLLM](https://github.com/BerriAI/litellm) | 100+ LLM 提供商统一 API 接口（v1.3.0） |
+| [NiceGUI](https://github.com/zauberzeug/nicegui) | 桌面 GUI 框架（浏览器 + 原生窗口）（v1.2.0） |
+| [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Windows 独立可执行文件打包（v1.3.1） |
