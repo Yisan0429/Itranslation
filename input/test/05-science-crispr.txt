@@ -1,0 +1,1 @@
+CRISPR-Cas9 is a genome editing tool that uses a guide RNA to direct the Cas9 nuclease to a specific DNA sequence, where it creates a double-strand break. The cell's natural repair mechanisms then either introduce small insertions or deletions via non-homologous end joining, or use a donor template for precise edits via homology-directed repair.

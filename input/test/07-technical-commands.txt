@@ -1,0 +1,5 @@
+To initialize the database, run:
+```bash
+python manage.py migrate --database=production
+```
+The configuration file at `/etc/app/config.yaml` must contain a valid `DATABASE_URL` in the format `postgresql://user:***@localhost:5432/dbname`. Do NOT hardcode credentials in `settings.py` — use environment variables instead.

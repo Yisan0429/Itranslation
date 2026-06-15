@@ -1,0 +1,1 @@
+The reaction was carried out at 37°C for 24 hours in a phosphate buffer (pH 7.4). The enzyme activity was measured at 340 nm using a spectrophotometer. Under optimal conditions, the Km value was determined to be 2.3 ± 0.1 mM and Vmax reached 45.7 μmol/min/mg. All measurements were performed in triplicate (n=3).

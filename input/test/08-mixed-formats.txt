@@ -1,0 +1,9 @@
+The relationship between pressure and volume is given by the ideal gas law: $$PV = nRT$$
+where P is pressure (Pa), V is volume (m³), n is the number of moles, R is the gas constant (8.314 J/mol·K), and T is temperature (K).
+
+Key assumptions:
+- Gas particles have negligible volume
+- No intermolecular forces
+- Collisions are perfectly elastic
+
+For further details, see https://en.wikipedia.org/wiki/Kinetic_theory_of_gases.
