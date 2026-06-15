@@ -3,6 +3,18 @@
 ## v1.3.2 (2026-06-15)
 
 ### 🚀 新增
+- **翻译提示词全面升级**
+  - 系统提示：出版级译者身份 + 5 条翻译哲学 + 避免翻译腔指导
+  - Reflection 提示：6 维审查（准确/流畅/术语/风格/文化/句式）+ 体裁特定关注点
+  - Revision 提示：修订原则（准确优先/自然中文/流水句）
+  - 体裁指令大幅扩展（每体裁 3-5 行详细指导）
+- **十项测试语料库** — `input/test/` 目录 10 个源文件 + `src/test_corpus.py` 参考译文与元数据
+  - 覆盖 5 种体裁：文学(3) / 哲学(1) / 自然科学(3) / 社会科学(2) / 技术(1)
+  - 8 个测试维度：基础翻译/数据保护/格式保护/对话/长句/专有名词/引用/公式代码
+
+## v1.3.1 (2026-06-15)
+
+### 🚀 新增
 - **稳定性加固** — 单块 API 失败不再崩溃全流程
   - `translate_chapter` 返回 `(translations, errors)` 元组
   - 每块 try/except，失败后填入占位符继续翻剩余块
@@ -11,32 +23,18 @@
   - 翻译前显示总字符/块数/预估 token/预估费用
   - 实时进度条：spinner + bar + 块数 + 已用/剩余时间
   - 大文本（>200 块）自动建议开启并行
-- **翻译提示词全面升级**
-  - 系统提示：出版级译者身份 + 5 条翻译哲学 + 避免翻译腔指导
-  - Reflection 提示：6 维审查（准确/流畅/术语/风格/文化/句式）+ 体裁特定关注点
-  - Revision 提示：修订原则（准确优先/自然中文/流水句）
-  - 体裁指令大幅扩展（每体裁 3-5 行详细指导）
 - **GUI 缓存检测** — 翻译前弹窗：清除重译 / 保留续翻 / 取消
-- **十项测试语料库** — `input/test/` 目录 10 个源文件 + `src/test_corpus.py` 参考译文与元数据
-  - 覆盖 5 种体裁：文学(3) / 哲学(1) / 自然科学(3) / 社会科学(2) / 技术(1)
-  - 8 个测试维度：基础翻译/数据保护/格式保护/对话/长句/专有名词/引用/公式代码
-
-### 🔧 改进
-- GUI 日志区分 ✅ 完成 / ⚠️ 错误，翻译结束后汇总错误块
-- 新增 PyInstaller 构建配置 `Itranslation-cli.spec`，产出 76MB Windows exe
-- `.gitignore` 添加 dist/ 和 *.zip 防护
-
-## v1.3.1 (2026-06-15)
-
-### 🚀 新增
 - **模型全面更新** — GPT-4o→GPT-5.5、Claude Sonnet 4→Opus 4.8/Sonnet 4.6/Fable 5、Gemini 2.5→3.5、Mimo V1→MiMo V2.5
 - **Mimo 平台支持** — MiMo-V2.5-Pro / MiMo-V2.5-Omni 加入翻译模型表
 
 ### 🔧 改进
+- GUI 日志区分 ✅ 完成 / ⚠️ 错误，翻译结束后汇总错误块
 - GUI Provider 下拉改为平台名：DeepSeek / OpenAI / Anthropic / Google / Mimo / Custom
 - 删除 Groq/Qwen 支持，删除成本估算和已知不足章节
 - README 中英双版全面清理：去 bold 版本标签、EN 版去中文、TBL→TranslateBooksWithLLMs 全称
 - 竞品对比表新增 Translation Agent、TranslateBooksWithLLMs，删除 Immersive Translate 和 epub-translator
+- 新增 PyInstaller 构建配置 `Itranslation-cli.spec`，产出 76MB Windows exe
+- `.gitignore` 添加 dist/ 和 *.zip 防护
 
 ## v1.3.0 (2026-06-15)
 
