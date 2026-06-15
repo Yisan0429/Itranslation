@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.2.0-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.3.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
   <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
@@ -11,10 +11,10 @@
 </p>
 
 <h1 align="center">Itranslation</h1>
-<p align="center"><strong>AI-Powered Book Translation · CLI</strong></p>
+<p align="center"><strong>AI-Powered Book Translation · CLI + Desktop GUI</strong></p>
 <p align="center">
   PDF · EPUB · TXT · Markdown → Chinese<br>
-  Sentence-Level Chunking · Overlap Redundancy · Consistency Audit · Checkpoint/Resume · Cost Tracking
+  Sentence-Level Chunking · Overlap Redundancy · RAT · KG Pre-Read · Reflection · Consistency Audit · Checkpoint/Resume · Cost Tracking
 </p>
 
 > **⚠️ 项目尚不成熟。** 建议先用短文本（< 3000 词）测试，确认翻译质量与费用符合预期后再处理大文件。翻译中途可能因网络波动或 API 异常中断，避免无效花费。
@@ -23,9 +23,7 @@
 
 ## Overview
 
-Itranslation is a desktop application and command-line tool for translating entire books using large language models. It accepts PDF, EPUB, TXT, and Markdown files, processes them through a multi-phase pipeline with sentence-level chunking, terminology consistency auditing, and retrieval-augmented translation (RAT), then outputs clean Chinese text in TXT, Markdown, or PDF format.
-
-Unlike tools that split text at arbitrary line boundaries, Itranslation tokenizes at the sentence level and employs overlapping chunks with a first-lock deduplication strategy — ensuring that no sentence is ever broken mid-thought.
+Itranslation is a desktop application and command-line tool for translating entire books using large language models. It accepts PDF, EPUB, TXT, and Markdown files, processes them through a multi-phase pipeline with sentence-level chunking, retrieval-augmented translation (RAT), agentic knowledge-graph pre-reading, terminology consistency auditing, and an optional reflection workflow — then outputs clean Chinese text in TXT, Markdown, PDF, or EPUB format.
 
 ---
 
@@ -35,10 +33,12 @@ Unlike tools that split text at arbitrary line boundaries, Itranslation tokenize
 |---|---|---|
 | Chunking | Fixed line count (e.g., every 10 lines) | Sentence-level tokenization with configurable overlap |
 | Terminology Consistency | Relies on LLM memory across calls | Incremental tracking model with automated drift detection |
-| Translation Quality | Single-pass, no validation | Overlap redundancy + real-time audit at configurable intervals |
+| Translation Quality | Single-pass, no validation | Overlap redundancy + RAT + KG pre-read + real-time audit at configurable intervals |
+| Post-Translation QA | Output as-is | **Reflection workflow**: LLM self-review → revision (translate → reflect → improve) |
 | Interruption Handling | Restart from beginning | Pause/Resume in GUI; checkpoint-based resume in CLI and GUI |
 | Cost Visibility | Unknown until billing | Per-chunk token consumption and cost displayed in real time ($/¥) |
-| Model Flexibility | Hardcoded provider | Preset models (DeepSeek V4 Pro/Flash) + custom OpenAI-compatible API configuration |
+| Model Flexibility | Hardcoded provider | Models across 5 providers via liteLLM (DeepSeek, OpenAI, Anthropic, Google, Mimo) + custom API |
+| Quality Benchmarking | None | Built-in BLEU/chrF scoring + LLM-as-Judge evaluation suite |
 
 ---
 
@@ -112,11 +112,26 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 
 ### Translation Models
 
-| Model | Input Price | Output Price | Best For |
-|---|---|---|---|
-| DeepSeek V4 Pro | $0.435 / 1M tokens | $0.87 / 1M tokens | Highest translation quality |
-| DeepSeek V4 Flash | $0.14 / 1M tokens | $0.28 / 1M tokens | High-speed, cost-sensitive tasks |
-| Custom | — | — | Any OpenAI-compatible API (Ollama, vLLM, Groq, etc.) |
+Itranslation supports models across major providers via liteLLM integration, plus custom OpenAI-compatible APIs.
+
+| Provider | Model | Input Price | Output Price | Best For |
+|---|---|---|---|---|
+| DeepSeek | V4 Pro / V4 Flash | $0.14–0.435 | $0.28–0.87 | Best cost-quality ratio |
+| OpenAI | GPT-5.5 / GPT-5.5 Mini | $1.50–5.00 | $6.00–15.00 | Highest general quality |
+| Anthropic | Opus 4.8 / Sonnet 4.6 / Fable 5 | $3.00–10.00 | $15.00–50.00 | Literary nuance; complex reasoning |
+| Google | Gemini 3.5 Pro / 3.5 Flash | $0.30–3.50 | $1.50–10.50 | Long documents; speed |
+| Mimo | MiMo V2.5 Pro / V2.5 Omni | $0.40–1.20 | $1.60–4.80 | Multimodal understanding |
+| Custom | — | — | — | Any OpenAI-compatible API |
+
+### Reflection Workflow
+
+When enabled, each translated chunk goes through an additional quality loop:
+
+1. **Translate** — Initial LLM translation
+2. **Reflect** — LLM reviews the translation against the source, identifying issues in accuracy, fluency, terminology, and style
+3. **Revise** — LLM re-translates based on the reflection feedback
+
+This adds approximately 2× token consumption but significantly improves quality, especially for literary and philosophical texts. Configurable via `--reflect` flag (CLI) or Reflection switch (GUI).
 
 ### Parallel Translation (v1.1)
 
@@ -139,14 +154,14 @@ Input (PDF / EPUB / TXT / MD)
   ├─ Phase 1: Semantic Chunking
   │   └─ Sentence tokenization → greedy packing → overlap (3–4 sentences)
   │
-  ├─ Phase 2: Translation (Parallel)
-  │   └─ Per-chunk: terminology injection + context → LLM API → vector store
+  ├─ Phase 2: Translation (Parallel) + [Reflection]
+  │   └─ Per-chunk: terminology injection + context → LLM API → [Reflect → Revise] → vector store
   │
   ├─ Phase 3: Quality Audit
   │   └─ Consistency model: audit every N chunks; alert if term consistency < 80%
   │
   └─ Phase 4: Assembly
-      └─ Overlap removal (first-lock strategy) → TXT / MD / PDF output
+      └─ Overlap removal (first-lock strategy) → TXT / MD / PDF / EPUB output
 ```
 
 ### Core Design Decisions
@@ -156,23 +171,6 @@ Input (PDF / EPUB / TXT / MD)
 **Incremental Consistency Model.** Each term translation is recorded with its source location. After every 20 chunks (configurable), the model audits all tracked terms. Any term whose dominant translation falls below the 80% consistency threshold triggers an alert, identifying both the drift and the suggested canonical translation.
 
 **Retrieval-Augmented Translation.** Previously translated passages are stored in a ChromaDB vector store using `all-MiniLM-L6-v2` embeddings. When translating a new chunk, the system retrieves the most semantically similar prior translations and injects them as reference context into the LLM prompt.
-
----
-
-## Estimated Cost
-
-Based on DeepSeek V4 Pro pricing and measured throughput:
-
-| Book Size | Word Count | Est. Tokens | Est. Duration | Est. Cost |
-|---|---|---|---|---|
-| Short story | 3,000 | ~5K in / 5K out | ~10 sec | ~$0.01 (¥0.07) |
-| Novella | 30,000 | ~50K in / 50K out | ~2 min | ~$0.07 (¥0.50) |
-| Novel | 100,000 | ~150K in / 140K out | ~7 min | ~$0.20 (¥1.44) |
-| Epic | 300,000 | ~450K in / 420K out | ~20 min | ~$0.60 (¥4.32) |
-
-Measured: 1,196-word literary excerpt → 2 chunks → $0.0076 (¥0.06) .
-
-Cost calculation is automatic for DeepSeek models. Custom models display token counts without a monetary estimate to prevent misleading figures.
 
 ---
 
@@ -195,6 +193,13 @@ uv run python translate_book.py book.pdf \
   --model deepseek-v4-flash \
   --parallel 4 \
   --output final/translation
+
+# Use GPT-4o via liteLLM with reflection
+uv run python translate_book.py book.pdf \
+  --provider litellm \
+  --model openai/gpt-4o \
+  --reflect \
+  --format pdf
 ```
 
 ---
@@ -208,16 +213,19 @@ Itranslation/
 │   ├── extractor.py      PDF/EPUB/TXT/MD text extraction
 │   ├── kg_builder.py     Agentic pre-read and knowledge graph construction
 │   ├── chunker.py        Sentence-level semantic chunking with overlap
-│   ├── translator.py     Translation engine (RAT + terminology injection)
+│   ├── translator.py     Translation engine (RAT + terminology injection + reflection)
 │   ├── consistency.py    Incremental terminology consistency model
 │   ├── assembler.py      Overlap removal + TXT/MD/PDF/EPUB output
 │   ├── vector_store.py   ChromaDB vector store for RAT
+│   ├── format_protector.py  Code/formula/URL placeholder protection
+│   ├── api_client.py     Unified API client (HTTP + liteLLM, 6 providers)
+│   ├── benchmark.py      BLEU/chrF + LLM-as-Judge quality evaluation
 │   ├── config.py         Configuration (DEFAULT_CONFIG + config.json)
 │   ├── env_check.py      Optional feature readiness checker
 │   └── eval.py           Component evaluation suite
 ├── input/                Source documents
 ├── output/               Translations (one folder per book)
-├── reports/              Audit reports (consistency / eval)
+├── reports/              Audit reports + benchmark results
 ├── cache/                Checkpoint files (JSON)
 └── models/               Model cache (Marker, sentence-transformers)
 ```
@@ -230,42 +238,42 @@ Itranslation/
 
 | # | Project | Stars | Scope | Strengths | Limitations |
 |---|---------|-------|-------|-----------|-------------|
-| 1 | [Immersive Translate](https://github.com/immersive-translate/immersive-translate) | 17.8k | Browser extension (web, PDF, EPUB) | Broad platform coverage; 100+ languages; real-time bilingual display | Requires browser extension; not a standalone translation tool; Pro tier is paid |
-| 2 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI ebook translator | Mature ecosystem (5 years); bilingual output; 40+ models via liteLLM | No GUI; fixed-line chunking; no terminology auditing |
+| 1 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI ebook translator | Mature ecosystem (5 years); bilingual output; 40+ models via liteLLM | No GUI; fixed-line chunking; no terminology auditing |
+| 2 | [Translation Agent](https://github.com/andrewyng/translation-agent) | 5.8k | Agentic translation demo | Reflection workflow pioneer; highly customizable; MIT license | Experimental/demo; no book-specific features; no GUI |
 | 3 | [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | 2.5k | Calibre plugin | 48 input formats; 20 output formats; multiple translation engines | Requires Calibre; higher learning curve |
 | 4 | [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 1.7k | CLI ebook translator | Multi-format; modern v2 architecture; SQLite resume cache | CLI only; no translation quality auditing |
-| 5 | [epub-translator](https://github.com/oomol-lab/epub-translator) | 771 | EPUB bilingual translation library | Preserves original formatting; clean API | EPUB only; early-stage ecosystem |
+| 5 | [TranslateBooksWithLLMs](https://github.com/hydropix/TranslateBooksWithLLMs) | 450 | Desktop app (Web UI) | Pre-built executables (Win/Mac); EPUB/SRT/DOCX/TXT; formatting preservation; Docker | No sentence-level chunking; no RAT; no consistency auditing |
 
 ### Feature Comparison
 
-| Dimension | Itranslation v1.1 | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | epub-translator |
-|:---|:---:|:---:|:---:|:---:|:---:|
-| Desktop GUI | — (CLI-only v1.1.4) | — | ✓ (via Calibre) | — | — |
-| Checkpoint/Resume | ✓ (CLI) | ✓ | ✓ | ✓ | — |
-| Parallel Translation | ✓ (chapter-level) | ✓ (API batch) | ✓ (multi-book) | — | ✓ |
-| Sentence-Level Chunking | ✓ | — | — | — | — |
-| Overlap Redundancy | ✓ | — | — | — | — |
-| Terminology Consistency | ✓ (real-time audit) | Partial | — | — | — |
-| Genre Adaptation | ✓ (5 presets) | Partial | — | Partial | — |
-| Knowledge Graph Pre-Read | ✓ | — | — | — | — |
-| RAT-Augmented Translation | ✓ (ChromaDB) | — | — | — | — |
-| Cost Tracking | ✓ ($/¥ real-time) | — | — | — | ✓ |
-| Bilingual Output | — | ✓ | — | — | ✓ |
-| Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | EPUB |
-| Model Support | DeepSeek + custom | 40+ (liteLLM) | Multi-engine | OpenAI family | OpenAI / Claude |
-| Maturity | v1.1 (2026) | 5 years | 3 years | v2 (2025) | v0.1 (2025) |
+| Dimension | Itranslation v1.3 | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
+|:---|:---:|:---:|:---:|:---:|:---:|:---:|
+| Desktop GUI | ✓ (NiceGUI) | — | ✓ (via Calibre) | — | — | ✓ (Web) |
+| Checkpoint/Resume | ✓ (CLI+GUI) | ✓ | ✓ | ✓ | — | ✓ |
+| Parallel Translation | ✓ (chapter-level) | ✓ (API batch) | ✓ (multi-book) | — | — | ✓ |
+| Sentence-Level Chunking | ✓ | — | — | — | — | — |
+| Overlap Redundancy | ✓ | — | — | — | — | — |
+| Terminology Consistency | ✓ (real-time audit) | Partial | — | — | — | — |
+| Genre Adaptation | ✓ (5 presets) | Partial | — | Partial | — | — |
+| Knowledge Graph Pre-Read | ✓ | — | — | — | — | — |
+| RAT-Augmented Translation | ✓ (ChromaDB) | — | — | — | — | — |
+| **Reflection Workflow** | **✓ (v1.3)** | — | — | — | ✓ | — |
+| Format Protection | ✓ (v1.2) | — | — | — | — | — |
+| Cost Tracking | ✓ ($/¥ real-time) | — | — | — | — | ✓ |
+| Multi-Provider (liteLLM) | **✓ (v1.3, 5 providers)** | ✓ (40+ via liteLLM) | Multi-engine | OpenAI family | OpenAI | Multi-provider |
+| Bilingual Output | — | ✓ | — | — | — | — |
+| Benchmark Suite | **✓ (v1.3)** | — | — | — | — | ✓ |
+| Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | TXT | TXT / EPUB / SRT |
+| Model Support | DeepSeek + liteLLM | 40+ (liteLLM) | Multi-engine | OpenAI family | GPT-5.5 | Ollama/OpenAI/Gemini |
+| Maturity | v1.3 (2026) | 5 years | 3 years | v2 (2025) | Research (2025) | Active (2026) |
 
 ### Unique Advantages
 
-1. **Translation Quality Pipeline.** Sentence-level chunking, overlap redundancy, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project.
-2. **Cost Transparency.** Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
-3. **API with Built-in Retry.** All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
-
-### Known Limitations
-
-1. **No desktop GUI.** Removed in v1.1.4 while tkinter threading issues are resolved. Previous GUI code preserved in `.archive/`.
-2. **Limited input format coverage.** Four formats (PDF, EPUB, TXT, MD) versus Calibre Plugin's 48.
-3. **No scan PDF support.** Requires Marker model download (~2 GB).
+1. **Most Comprehensive Quality Pipeline in Open Source.** Sentence-level chunking, overlap redundancy, RAT retrieval, KG pre-read, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project. The new Reflection workflow adds a translate→reflect→revise cycle adapted from state-of-the-art agentic translation research.
+2. **Multi-Provider Model Ecosystem.** liteLLM integration provides access to models across 5 providers (DeepSeek, OpenAI, Anthropic, Google, Mimo) with a unified interface, while retaining the zero-dependency direct HTTP path for DeepSeek.
+3. **Built-in Quality Benchmarks.** The `benchmark.py` suite provides BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style dimensions.
+4. **Cost Transparency.** Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
+5. **API with Built-in Retry.** All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
 
 ---
 

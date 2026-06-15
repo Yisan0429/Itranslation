@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.3.0 (2026-06-15)
+
+### 🚀 新增
+- **liteLLM 多模型生态** — `api_client.py` 集成 liteLLM，支持 6 大 Provider 20+ 模型
+  - DeepSeek / OpenAI / Anthropic / Google / Groq / Qwen 统一接口
+  - CLI: `--provider litellm --model openai/gpt-4o`
+  - GUI: Provider 下拉 + 模型预设选择
+- **Reflection 反思工作流** — `translator.py` 增加 translate→reflect→revise 循环
+  - 每块翻译后 LLM 自审（accuracy/fluency/terminology/style）
+  - 根据反馈自动修订，显著提升翻译质量
+  - CLI: `--reflect`；GUI: Reflection 开关
+  - 配置: `enable_reflection`, `reflection_depth`
+- **Benchmark 基准测试系统** — `src/benchmark.py`
+  - BLEU/chrF 自动评分（sacrebleu）
+  - LLM-as-Judge 四维质量评估（accuracy/fluency/terminology/style）
+  - 6 样本多体裁基准语料库（文学/哲学/自然科学/社会科学）
+  - 组件回归测试（Chunker/Consistency/Assembler）
+
+### 🔧 改进
+- GUI 增加 Provider 选择、模型预设下拉、Reflection 开关
+- CLI 增加 `--provider`、`--reflect`、`--reflect-depth` 参数
+- 配置增加 `provider`、`litellm_api_key`、`enable_reflection`、`reflection_depth`、`MODEL_PRESETS`
+- 定价表扩展至 12 个模型（DeepSeek/OpenAI/Anthropic/Google/Groq/Qwen）
+
+### 📖 文档
+- README 对比表更新至 v1.3，新增 TBL 竞品对比
+- 新增 Reflection Workflow 章节
+- 更新架构图、项目结构、Known Limitations
+
 ## v1.2.0 (2026-06-14)
 
 ### 🚀 新增
@@ -17,12 +46,6 @@
 
 ### 📖 文档
 - README 中英双版添加项目成熟度警告
-
-## v1.1.4 (2026-06-14)
-
-### 🏗️ 架构改进
-- **API 客户端解耦** — 将 `_call_deepseek` 提取为独立的 `src/api_client.py`，消除 `eval.py` ↔ `translate_book.py` 的循环导入
-- **统一重试机制** — `call_api()` 内置指数退避重试，KG 预读等直接 API 调用不再缺失重试保护
 
 ### 🐛 修复
 - 并行模式下 `cfg["_cost"]` token 计数竞态条件（使用 `cost_lock` 保护累加操作）

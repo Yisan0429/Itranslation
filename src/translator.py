@@ -1,13 +1,16 @@
 """
-Phase 2: RAT 翻译引擎。
+Phase 2: RAT 翻译引擎 + Reflection 反思工作流。
 
 Retrieval-Augmented Translation:
 1. 从向量库检索最相似已翻译段落
 2. 从 KG/glossary 注入术语
 3. 附加上一块重叠上下文
 4. 调用 LLM 翻译
-5. 存储结果到向量库 + 更新一致性模型
+5. [可选] Reflection: LLM 自审 → 修订
+6. 存储结果到向量库 + 更新一致性模型
 """
+
+from __future__ import annotations
 
 import json
 import time
@@ -22,6 +25,29 @@ from assembler import SENTENCE_SEPARATOR, SENTENCE_INSTRUCTION
 console = Console()
 
 BATCH_DELIMITER = "\n\n␞␞␞\n\n"
+
+# ── Reflection Prompts ──────────────────────────────────────────────
+
+REFLECTION_SYSTEM_PROMPT = """You are a translation quality reviewer. Your task is to review an English→Chinese translation and identify specific issues.
+
+For each issue, state:
+1. The type: accuracy (mistranslation), fluency (awkward Chinese), terminology (inconsistent term), style (tone mismatch), omission (missing content)
+2. The specific problem
+3. A suggested fix
+
+Be concise and actionable. If the translation is excellent, say so briefly.
+
+Output format:
+[ISSUE_TYPE] problem description → suggested fix
+...
+
+If no issues: [OK] Translation is accurate and natural."""
+
+REVISION_SYSTEM_PROMPT = """You are a professional translator. Your initial translation has been reviewed and the following issues were identified:
+
+{reflection_feedback}
+
+Please revise the translation to address ALL identified issues. Output ONLY the revised translation, no explanations."""
 
 
 def translate_chapter(
@@ -51,6 +77,9 @@ def translate_chapter(
         checkpoint = {}
     done_ids = set(checkpoint.get("completed_chunks", []))
 
+    enable_reflection = config.get("enable_reflection", False)
+    reflection_depth = config.get("reflection_depth", 1)
+
     translations = []
 
     for i, chunk in enumerate(chunks):
@@ -69,10 +98,16 @@ def translate_chapter(
             chunk, rat_context, glossary, kg, config
         )
 
-        # 3. 调用 LLM
-        result, usage = _call_with_retry(
-            llm_call, system_prompt, user_prompt, chunk.id, config
-        )
+        # 3. 调用 LLM 翻译（可能含 reflection）
+        if enable_reflection:
+            result, usage = _translate_with_reflection(
+                llm_call, system_prompt, user_prompt, chunk,
+                config, reflection_depth, cost_lock,
+            )
+        else:
+            result, usage = _call_with_retry(
+                llm_call, system_prompt, user_prompt, chunk.id, config
+            )
 
         # 累加成本（线程安全）
         if cost_lock:
@@ -114,9 +149,94 @@ def translate_chapter(
                 for iss in issues[:3]:
                     console.print(f"     {iss['term']}: {iss['consistency']:.0%} → 建议 '{iss['dominant']}'")
 
-        console.print(f"  [{i+1}/{len(chunks)}] ✅ {chunk.id}")
+        tag = "🔄" if enable_reflection else "✅"
+        console.print(f"  [{i+1}/{len(chunks)}] {tag} {chunk.id}")
 
     return translations
+
+
+def _translate_with_reflection(
+    llm_call: Callable,
+    system_prompt: str,
+    user_prompt: str,
+    chunk,
+    config: dict,
+    depth: int,
+    cost_lock: threading.Lock | None,
+) -> tuple[str, dict]:
+    """带 Reflection 反思的翻译：翻译 → 自审 → 修订。"""
+    genre = config.get("genre", "auto")
+
+    # Step 1: 初始翻译
+    initial, usage1 = _call_with_retry(llm_call, system_prompt, user_prompt, chunk.id, config)
+    total_usage = dict(usage1)
+
+    current = initial
+
+    for round_num in range(depth):
+        # Step 2: Reflection — LLM 审查翻译质量
+        reflect_user = _build_reflection_prompt(chunk.text, current, genre)
+        try:
+            reflection, usage_r = llm_call(REFLECTION_SYSTEM_PROMPT, reflect_user)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️ Reflection 失败: {e}，跳过修订[/yellow]")
+            break
+
+        _merge_usage(total_usage, usage_r)
+        if cost_lock:
+            with cost_lock:
+                _accumulate_cost(config, usage_r)
+        else:
+            _accumulate_cost(config, usage_r)
+
+        # 如果翻译已经很好，跳过修订
+        if reflection.strip().startswith("[OK]"):
+            console.print(f"    [dim]Reflection #{round_num+1}: 翻译质量良好，跳过修订[/dim]")
+            break
+
+        # Step 3: Revision — 根据反馈修订
+        revision_system = REVISION_SYSTEM_PROMPT.format(reflection_feedback=reflection)
+        revision_user = f"Source text:\n{chunk.text}\n\nInitial translation:\n{current}\n\nPlease revise."
+        try:
+            revised, usage_v = llm_call(revision_system, revision_user)
+        except Exception as e:
+            console.print(f"  [yellow]⚠️ Revision 失败: {e}，保留当前版本[/yellow]")
+            break
+
+        _merge_usage(total_usage, usage_v)
+        if cost_lock:
+            with cost_lock:
+                _accumulate_cost(config, usage_v)
+        else:
+            _accumulate_cost(config, usage_v)
+
+        current = revised
+        console.print(f"    [dim]Reflection #{round_num+1}: 已修订[/dim]")
+
+    return current, total_usage
+
+
+def _build_reflection_prompt(source: str, translation: str, genre: str) -> str:
+    """构建 Reflection 审查提示。"""
+    focus = ["accuracy", "fluency", "terminology", "style"]
+    focus_str = ", ".join(focus)
+
+    return f"""Review this English→Chinese translation ({genre} genre).
+
+Source (English):
+{source[:2000]}
+
+Translation (Chinese):
+{translation[:2000]}
+
+Check for: {focus_str}.
+Be specific: what exactly is wrong and how to fix it."""
+
+
+def _merge_usage(total: dict, usage: dict):
+    """合并 token 用量。"""
+    for k in ("prompt_tokens", "completion_tokens"):
+        total[k] = total.get(k, 0) + usage.get(k, 0)
 
 
 def _accumulate_cost(config: dict, usage: dict):

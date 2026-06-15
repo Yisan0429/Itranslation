@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from nicegui import ui, app, run
-from config import load_config, calc_cost
+from config import load_config, calc_cost, MODEL_PRESETS
 from extractor import extract_book
 from chunker import chunk_text, parse_structure
 from format_protector import protect, restore
@@ -37,6 +37,7 @@ state = {
     "file_path": None,
     "file_name": "",
     "genre": "auto",
+    "provider": "deepseek",
     "model": "deepseek-v4-pro",
     "api_key": cfg.get("api_key", ""),
     "api_base": cfg.get("api_base", "https://api.deepseek.com/v1"),
@@ -46,6 +47,7 @@ state = {
     "enable_preread": False,
     "enable_rat": False,
     "use_vision": False,
+    "enable_reflection": False,
     "translating": False,
     "cancel_flag": False,
     "log_lines": [],
@@ -119,18 +121,27 @@ def _build_control_panel():
                     on_change=lambda e: state.update(parallel=0 if e.value == "自动" else int(e.value)),
                 ).classes("w-full")
 
-        # 模型 + API
-        ui.label("模型").classes("text-xs text-gray-500 mt-1")
+        # Provider + 模型
+        ui.label("Provider").classes("text-xs text-gray-500 mt-1")
         with ui.row().classes("w-full gap-2"):
+            # 平台下拉（DeepSeek / OpenAI / Anthropic / Google / Mimo / Custom）
+            provider_labels = list(dict.fromkeys(p["provider_label"] for p in MODEL_PRESETS))
             ui.select(
-                options=["deepseek-v4-pro", "deepseek-v4-flash", "自定义"],
-                value="deepseek-v4-pro",
-                on_change=lambda e: _on_model_change(e.value),
+                options=provider_labels,
+                value="DeepSeek",
+                on_change=lambda e: _on_provider_change(e.value),
             ).classes("flex-1")
-            state["model_input"] = ui.input(value="deepseek-v4-pro",
-                on_change=lambda e: state.update(model=e.value))
-            state["model_input"].classes("flex-1")
-            state["model_input"].set_visibility(False)
+            # 模型下拉（根据所选平台动态更新）
+            state["model_select"] = ui.select(
+                options=[p["label"] for p in MODEL_PRESETS if p["provider_label"] == "DeepSeek"],
+                value="V4 Pro",
+                on_change=lambda e: _on_model_select(e.value),
+            ).classes("flex-1")
+        state["model_input"] = ui.input(value="",
+            placeholder="输入模型名 (如 openai/gpt-5.5)",
+            on_change=lambda e: state.update(model=e.value))
+        state["model_input"].classes("w-full mt-1")
+        state["model_input"].set_visibility(False)
 
         ui.label("API Key").classes("text-xs text-gray-500 mt-1")
         state["api_key_input"] = ui.input(
@@ -153,6 +164,8 @@ def _build_control_panel():
                       on_change=lambda e: state.update(enable_rat=e.value))
             ui.switch("Marker", value=False,
                       on_change=lambda e: state.update(use_vision=e.value))
+            ui.switch("Reflection", value=False,
+                      on_change=lambda e: state.update(enable_reflection=e.value))
 
         # 按钮 + 状态
         state["start_btn"] = ui.button(
@@ -197,12 +210,37 @@ def _build_preview_panel():
             .props("readonly outlined dense").classes("w-full text-2xs")
 
 
-def _on_model_change(value):
-    if value == "自定义":
+def _on_provider_change(provider_label: str):
+    """切换平台时更新模型下拉列表。"""
+    # 查找该平台的实际 provider 类型
+    presets = [p for p in MODEL_PRESETS if p["provider_label"] == provider_label]
+    if not presets:
+        return
+
+    actual_provider = presets[0]["provider"]
+    state["provider"] = actual_provider
+
+    if actual_provider == "custom":
+        state["model_select"].set_visibility(False)
         state["model_input"].set_visibility(True)
+        state["model_input"].value = ""
+        state["model"] = ""
     else:
-        state.update(model=value)
+        labels = [p["label"] for p in presets]
+        state["model_select"].options = labels
+        state["model_select"].value = labels[0]
+        state["model_select"].set_visibility(True)
         state["model_input"].set_visibility(False)
+        # 同步 model ID
+        state["model"] = presets[0]["model"]
+
+
+def _on_model_select(label: str):
+    """模型下拉选择时更新 model ID。"""
+    for p in MODEL_PRESETS:
+        if p["label"] == label:
+            state["model"] = p["model"]
+            return
 
 
 # ═══════════════════════════════════════════════════════
@@ -242,6 +280,38 @@ def _cancel_translation():
     ui.notify("取消中...", type="warning")
 
 
+async def _ask_clear_cache(book_name: str, checkpoints: list, outputs: list) -> bool | None:
+    """弹窗询问：检测到旧缓存，是否清除后重新翻译？
+    Returns: True=清除, False=保留续翻, None=取消
+    """
+    cp_names = [cp.stem.replace("checkpoint_", "") for cp in checkpoints]
+    msg = f"「{book_name}」已有翻译记录"
+    if cp_names:
+        msg += f"\n断点: {', '.join(cp_names[:5])}"
+    if outputs:
+        msg += f"\n输出: {len(outputs)} 个文件"
+    msg += "\n\n清除后重新翻译？"
+
+    result = {"value": None}
+
+    with ui.dialog() as dialog, ui.card().classes("p-4 gap-2"):
+        ui.label(msg).classes("text-sm whitespace-pre-line")
+        with ui.row().classes("gap-2 mt-2"):
+            ui.button("清除重译", on_click=lambda: [_set_result(result, True), dialog.close()])\
+                .classes("bg-red-600 text-white")
+            ui.button("保留续翻", on_click=lambda: [_set_result(result, False), dialog.close()])\
+                .classes("bg-gray-200 text-black")
+            ui.button("取消", on_click=lambda: dialog.close())\
+                .classes("bg-gray-100 text-black")
+
+    await dialog
+    return result["value"]
+
+
+def _set_result(container: dict, value):
+    container["value"] = value
+
+
 def _log(msg: str):
     """添加日志。"""
     state["log_lines"].append(msg)
@@ -267,7 +337,7 @@ def _update_progress_ui():
 
 
 async def _start_translation():
-    """开始翻译。"""
+    """开始翻译。如有 checkpoint 则询问是否清除。"""
     if state["translating"]:
         return
 
@@ -275,6 +345,25 @@ async def _start_translation():
     if not fp or not Path(fp).exists():
         ui.notify("请先选择文件", type="warning")
         return
+
+    # 检查是否有旧的 checkpoint/输出
+    book_name = Path(fp).stem
+    cache_dir = PROJECT_ROOT / "cache"
+    existing_checkpoints = list(cache_dir.glob(f"checkpoint_*.json"))
+    existing_output = list((PROJECT_ROOT / "output" / book_name).glob(f"{book_name}.*")) if (PROJECT_ROOT / "output" / book_name).exists() else []
+
+    if existing_checkpoints or existing_output:
+        result = await _ask_clear_cache(book_name, existing_checkpoints, existing_output)
+        if result is None:  # 用户取消
+            return
+        if result:  # 清除缓存
+            for cp in existing_checkpoints:
+                cp.unlink(missing_ok=True)
+            import shutil
+            out_dir = PROJECT_ROOT / "output" / book_name
+            if out_dir.exists():
+                shutil.rmtree(out_dir)
+            ui.notify("已清除缓存，重新翻译", type="positive")
 
     state["translating"] = True
     state["cancel_flag"] = False
@@ -327,12 +416,14 @@ def _run_translation_pipeline():
     """在后台线程中运行完整翻译管线。"""
     start_time = time.time()
     cfg_local = load_config()
+    cfg_local["provider"] = state["provider"]
     cfg_local["model"] = state["model"]
     cfg_local["api_key"] = state["api_key"]
     cfg_local["api_base"] = state["api_base"]
     cfg_local["genre"] = state["genre"]
     cfg_local["parallel_workers"] = state["parallel"]
     cfg_local["enable_agentic_preread"] = state["enable_preread"]
+    cfg_local["enable_reflection"] = state["enable_reflection"]
 
     # 自动并行数：0 = 按章节数自动
     actual_parallel = state["parallel"]
@@ -417,6 +508,7 @@ def _run_translation_pipeline():
                 model=cfg_local["model"],
                 system_prompt=sp, user_prompt=up,
                 max_tokens=4096,
+                provider=state["provider"],
             )
 
         try:
@@ -437,6 +529,7 @@ def _run_translation_pipeline():
             model=cfg_local["model"],
             system_prompt=sp, user_prompt=up,
             max_tokens=cfg_local.get("max_tokens_per_chunk", 4096),
+            provider=state["provider"],
         )
 
     cost_lock = th.Lock()

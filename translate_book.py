@@ -6,6 +6,7 @@ book-translation CLI — 端到端书籍翻译。
     python translate_book.py input/book.pdf
     python translate_book.py input/book.pdf --genre philosophy --no-preread
     python translate_book.py input/book.epub --model deepseek-v4-pro
+    python translate_book.py input/book.pdf --provider litellm --model openai/gpt-4o --reflect
 """
 
 import argparse
@@ -24,7 +25,7 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import load_config, save_config, DEFAULT_CONFIG, calc_cost
+from config import load_config, save_config, DEFAULT_CONFIG, calc_cost, MODEL_PRESETS
 from api_client import call_api
 from extractor import extract_book
 from kg_builder import build_knowledge_graph, kg_to_glossary
@@ -34,7 +35,6 @@ from vector_store import TranslationVectorStore
 from consistency import ConsistencyModel, generate_consistency_report
 from translator import translate_chapter
 from assembler import assemble_translations, assemble_book
-from api_client import call_api
 
 console = Console()
 
@@ -48,12 +48,15 @@ def main():
     parser.add_argument("book", help="输入文件路径 (PDF/EPUB/TXT)")
     parser.add_argument("--config", help="配置文件路径 (JSON)", default=None)
     parser.add_argument("--genre", help="体裁 (auto|literature|philosophy|natural_science|social_science|technical)", default="auto")
+    parser.add_argument("--provider", help="LLM 提供商 (deepseek|litellm|custom)", default="deepseek")
     parser.add_argument("--model", help="LLM 模型名", default="deepseek-v4-pro")
     parser.add_argument("--api-key", help="API Key", default=None)
     parser.add_argument("--api-base", help="API Base URL", default=None)
     parser.add_argument("--no-vision", help="禁用 marker 视觉提取，使用 fitz", action="store_true")
     parser.add_argument("--no-preread", help="跳过 Agentic Pre-Read (KG)", action="store_true")
     parser.add_argument("--no-rat", help="禁用 RAT 检索增强", action="store_true")
+    parser.add_argument("--reflect", help="启用 Reflection 反思工作流（翻译→自审→修订）", action="store_true")
+    parser.add_argument("--reflect-depth", help="Reflection 轮数（默认 1）", type=int, default=1)
     parser.add_argument("--target-tokens", help="每块目标 token 数", type=int, default=1500)
     parser.add_argument("--overlap", help="重叠句子数（覆盖默认值）", type=int, default=None)
     parser.add_argument("--output", help="输出文件路径", default=None)
@@ -66,6 +69,7 @@ def main():
 
     # 加载配置
     cfg = load_config(args.config)
+    cfg["provider"] = args.provider
     cfg["model"] = args.model
     if args.api_key:
         cfg["api_key"] = args.api_key
@@ -74,6 +78,9 @@ def main():
     cfg["genre"] = args.genre if args.genre != "auto" else cfg.get("genre", "auto")
     if args.overlap is not None:
         cfg["overlap_by_genre"][cfg["genre"]] = args.overlap
+    if args.reflect:
+        cfg["enable_reflection"] = True
+        cfg["reflection_depth"] = args.reflect_depth
 
     # 显示配置
     overlap = cfg["overlap_by_genre"].get(cfg["genre"], 3)
@@ -116,6 +123,7 @@ def main():
                 model=cfg.get("model", "deepseek-v4-pro"),
                 system_prompt=system_prompt, user_prompt=user_prompt,
                 max_tokens=4096,
+                provider=cfg.get("provider", "deepseek"),
             )
 
         kg = build_knowledge_graph(
@@ -168,10 +176,11 @@ def main():
 
     # === Phase 2: 翻译 ===
     parallel_workers = args.parallel if args.parallel > 0 else cfg.get("parallel_workers", 0)
+    reflect_tag = " · Reflection" if cfg.get("enable_reflection") else ""
     if parallel_workers > 1:
-        console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块, 并行 {parallel_workers} 线程) ━━━[/bold cyan]")
+        console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块, 并行 {parallel_workers} 线程{reflect_tag}) ━━━[/bold cyan]")
     else:
-        console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块) ━━━[/bold cyan]")
+        console.print(f"\n[bold cyan]━━━ Phase 2: RAT 翻译 ({total_chunks} 块{reflect_tag}) ━━━[/bold cyan]")
 
     # 初始化向量存储
     if args.no_rat:
@@ -188,13 +197,16 @@ def main():
     consistency_model = ConsistencyModel()
 
     # LLM 调用函数
-    def llm_translate(system_prompt, user_prompt):
+    provider = cfg.get("provider", "deepseek")
+
+    def make_llm_call(sp, up):
         return call_api(
             api_key=cfg.get("api_key", ""),
             api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
             model=cfg.get("model", "deepseek-v4-pro"),
-            system_prompt=system_prompt, user_prompt=user_prompt,
+            system_prompt=sp, user_prompt=up,
             max_tokens=cfg.get("max_tokens_per_chunk", 4096),
+            provider=provider,
         )
 
     all_chapter_translations = []
@@ -209,6 +221,7 @@ def main():
         def translate_one(title, chunks):
             cm = ConsistencyModel()
             checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
+
             def llm_call(sp, up):
                 return call_api(
                     api_key=cfg.get("api_key", ""),
@@ -216,7 +229,9 @@ def main():
                     model=cfg.get("model", "deepseek-v4-pro"),
                     system_prompt=sp, user_prompt=up,
                     max_tokens=cfg.get("max_tokens_per_chunk", 4096),
+                    provider=provider,
                 )
+
             trans = translate_chapter(
                 chapter_title=title, chunks=chunks,
                 vector_store=vector_store if not args.no_rat else None,
@@ -250,7 +265,7 @@ def main():
                 consistency_model=consistency_model,
                 glossary=glossary,
                 kg=kg,
-                llm_call=llm_translate,
+                llm_call=make_llm_call,
                 config=cfg,
                 checkpoint_path=checkpoint_path,
             )
@@ -309,15 +324,21 @@ def main():
 
 
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):
-    table = Table(title="📚 book-translation v1.1.4", show_header=False)
+    provider = cfg.get("provider", "deepseek")
+    model = cfg.get("model", "?")
+    reflect = "🔄" if cfg.get("enable_reflection") else "—"
+
+    table = Table(title="📚 Itranslation v1.3.0", show_header=False)
     table.add_column(style="bold cyan")
     table.add_column()
     table.add_row("输入", book_path)
-    table.add_row("模型", cfg.get("model", "?"))
+    table.add_row("Provider", provider)
+    table.add_row("模型", f"{model}  (via {provider})")
     table.add_row("体裁", cfg.get("genre", "auto"))
     table.add_row("分块大小", f"{target_tokens} tokens/块")
     table.add_row("重叠", f"{overlap} 句")
     table.add_row("RAT", "启用" if cfg.get("rat_top_k", 5) > 0 else "禁用")
+    table.add_row("Reflection", reflect)
     console.print(table)
 
 
@@ -361,9 +382,15 @@ def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: in
     elapsed = time.time() - start_time if start_time else 0
     dur_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
 
+    provider = cfg.get("provider", "deepseek")
+    reflect = "🔄 启用" if cfg.get("enable_reflection") else "禁用"
+
     console.print()
     console.print("=" * 55)
     console.print("[bold green]✅ 翻译完成！[/bold green]")
+    console.print(f"  Provider: {provider}")
+    console.print(f"  Model: {model}")
+    console.print(f"  Reflection: {reflect}")
     console.print(f"  章节: {num_chapters} 章")
     console.print(f"  分块: {num_chunks} 块")
     console.print(f"  术语漂移: {num_issues} 个")
