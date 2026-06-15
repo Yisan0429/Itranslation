@@ -25,7 +25,7 @@
 
 Itranslation is a desktop application and command-line tool for translating entire books using large language models. It accepts PDF, EPUB, TXT, and Markdown files, processes them through a multi-phase pipeline with sentence-level chunking, retrieval-augmented translation (RAT), agentic knowledge-graph pre-reading, terminology consistency auditing, and an optional reflection workflow — then outputs clean Chinese text in TXT, Markdown, PDF, or EPUB format.
 
-> **Knowledge should be free.** We encourage all users to share their translated books publicly — on [Internet Archive](https://archive.org), GitHub, personal blogs, or any open platform. Every translation removes a language barrier between a reader and a book.
+> **Knowledge should be free.** We encourage all users to share their translated books publicly — on [Internet Archive](https://archive.org), [GitHub](https://github.com), personal blogs, or any open platform. Every translation removes a language barrier between a reader and a book.
 
 ---
 
