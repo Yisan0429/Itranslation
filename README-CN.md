@@ -120,7 +120,7 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 | OpenAI | GPT-5.5 / GPT-5.5 Mini | $1.50–5.00 | $6.00–15.00 | 通用质量最高 |
 | Anthropic | Opus 4.8 / Sonnet 4.6 / Fable 5 | $3.00–10.00 | $15.00–50.00 | 文学翻译见长；复杂推理 |
 | Google | Gemini 3.5 Pro / 3.5 Flash | $0.30–3.50 | $1.50–10.50 | 长文档处理；速度优先 |
-| Mimo | MiMo-V2.5-Pro / MiMo-V2.5-Omni | $0.40–1.20 | $1.60–4.80 | 多模态理解 |
+| Mimo | MiMo-V2.5-Pro / MiMo-V2.5 | $0.40–1.20 | $1.60–4.80 | 多模态理解 |
 | 自定义 | — | — | — | 任何 OpenAI 兼容 API |
 
 ### Reflection 反思工作流
