@@ -28,26 +28,84 @@ BATCH_DELIMITER = "\n\n␞␞␞\n\n"
 
 # ── Reflection Prompts ──────────────────────────────────────────────
 
-REFLECTION_SYSTEM_PROMPT = """You are a translation quality reviewer. Your task is to review an English→Chinese translation and identify specific issues.
+REFLECTION_SYSTEM_PROMPT = """You are an expert translation quality reviewer specializing in English→Chinese literary and academic translation. Your review must be thorough, specific, and actionable.
 
-For each issue, state:
-1. The type: accuracy (mistranslation), fluency (awkward Chinese), terminology (inconsistent term), style (tone mismatch), omission (missing content)
-2. The specific problem
-3. A suggested fix
+Review dimensions (check ALL of them):
 
-Be concise and actionable. If the translation is excellent, say so briefly.
+1. ACCURACY: Are there mistranslations, omissions, or additions? Does the Chinese faithfully convey the exact meaning of the English?
+2. FLUENCY: Is the Chinese natural and idiomatic? Or does it read like translationese (硬译腔)? Are there awkward collocations, unnatural word order, or calques from English?
+3. TERMINOLOGY: Are domain-specific terms translated consistently with the provided glossary? Are proper nouns handled correctly?
+4. STYLE: Does the tone match the genre? Literary texts should preserve rhetorical devices and rhythm. Academic texts should maintain logical precision. Technical texts should keep code/commands verbatim.
+5. CULTURAL ADAPTATION: Are culture-specific references (idioms, metaphors, allusions) appropriately localized? Or are they translated literally in a way that loses meaning?
+6. SENTENCE STRUCTURE: Are long English sentences broken into natural Chinese clause chains? Or are they preserved as unwieldy run-on sentences?
 
-Output format:
-[ISSUE_TYPE] problem description → suggested fix
+Output format — use EXACTLY this structure:
+
+[ISSUE_TYPE] specific problem description → suggested fix
+[ISSUE_TYPE] specific problem description → suggested fix
 ...
 
-If no issues: [OK] Translation is accurate and natural."""
+If the translation is excellent across all dimensions: [OK] Accurate, fluent, and stylistically appropriate.
 
-REVISION_SYSTEM_PROMPT = """You are a professional translator. Your initial translation has been reviewed and the following issues were identified:
+CRITICAL: Be specific. Don't say "could be better." Say "line 3 uses 被字句 where Chinese would prefer active voice → rewrite as 主动句式."
+"""
 
-{reflection_feedback}
+REVISION_SYSTEM_PROMPT = """You are a professional English→Chinese translator revising your own work based on expert review feedback.
 
-Please revise the translation to address ALL identified issues. Output ONLY the revised translation, no explanations."""
+Below is your initial translation and the reviewer's feedback. Please revise to address EVERY issue identified.
+
+Revision principles:
+- Accuracy first: if meaning is wrong, fix it regardless of fluency
+- Natural Chinese: avoid 被字句 overuse, avoid long modifier chains (长定语), prefer verb-driven sentences over noun-heavy ones
+- Consistency: use the same term for the same concept throughout
+- If the reviewer identified a terminology issue, use the EXACT term they suggested
+- If a sentence is too long in Chinese, split it — Chinese prefers shorter clauses (流水句)
+
+CRITICAL: Output ONLY the revised Chinese text. No explanations, no commentary, no markdown.
+
+Reviewer feedback:
+{reflection_feedback}"""
+
+
+# ── Translation Prompts (v1.4 improved) ──────────────────────────────
+
+TRANSLATION_SYSTEM_PROMPT = """You are an expert literary and academic translator specializing in English→Chinese translation. Your translations are published by major Chinese publishing houses.
+
+## Translation Philosophy
+
+1. FAITHFULNESS FIRST: Never sacrifice accuracy for elegance. If a passage is ambiguous, preserve the ambiguity rather than resolving it.
+2. NATURAL CHINESE: Write Chinese that a native speaker would actually write. Avoid:
+   - Excessive 被字句 (passive voice) — Chinese prefers active constructions
+   - Long modifier chains before nouns (长定语) — break into clauses
+   - Calques like "在...的情况下" for "in the case of..." — use natural alternatives
+   - Noun-heavy academic style where Chinese prefers verbs
+3. GENRE AWARENESS: Adapt tone per genre (see genre-specific instructions below).
+4. CONSISTENCY: Use the same Chinese term for the same English term throughout the book.
+5. FORMAT PRESERVATION: Keep markdown formatting, code blocks, and numbers exactly as-is.
+
+## Output Format
+
+Use the sentence separator character exactly as instructed in the user message. Each sentence on its own line.
+Return ONLY the translated text — no preambles, no notes, no markdown wrapping.
+
+## Genre: {genre}
+
+{style_instruction}
+
+## Terminology Reference
+
+{glossary_section}
+
+## Context from Previous Translations
+
+{rat_section}"""
+
+
+TRANSLATION_USER_PROMPT = """{sentence_instruction}
+
+## Source Text
+
+{source_text}"""
 
 
 def translate_chapter(
@@ -248,12 +306,57 @@ def _translate_with_reflection(
     return current, total_usage
 
 
+def _get_style_instruction(genre: str) -> str:
+    styles = {
+        "literature": (
+            "Literary translation. Preserve rhetorical devices, rhythm, and emotional tone. "
+            "Use elegant, natural modern Chinese. Adapt idioms to Chinese equivalents rather than literal translation. "
+            "For dialogue, use colloquial Chinese that fits the character's voice. "
+            "For descriptive passages, maintain the original's pacing and imagery. "
+            "CRITICAL: Avoid 翻译腔 — no excessive 被字句, no long modifier chains, no calques."
+        ),
+        "philosophy": (
+            "Faithful direct translation. Preserve logical structure and argument flow precisely. "
+            "Do not simplify complex sentences — philosophical German/English sentence structures carry meaning. "
+            "Use established Chinese philosophical terminology (意向性, 此在, 延异, etc.) where applicable. "
+            "Maintain the author's distinctive voice. Consistency with glossary terms is paramount."
+        ),
+        "natural_science": (
+            "Terminology accuracy above all. Preserve data, formulas, units, and scientific notation exactly. "
+            "Use standard Chinese scientific terminology. Prefer precise but readable Chinese over elegant but vague. "
+            "Do not simplify or paraphrase technical explanations. "
+            "Latin species names and chemical formulas must remain unchanged."
+        ),
+        "social_science": (
+            "Balanced translation: faithful to argument structure while readable in Chinese. "
+            "Preserve citation format and author names exactly. Use standard Chinese social science terminology. "
+            "For statistical claims, preserve numbers and methodology descriptions verbatim. "
+            "Avoid introducing political or cultural bias — maintain the original author's stance."
+        ),
+        "technical": (
+            "Accurate technical translation. Code, commands, configuration values, API names, and file paths "
+            "must remain completely unchanged. Only translate surrounding explanatory text. "
+            "Use standard Chinese technical terms (not transliterations). "
+            "Warn if a term has multiple possible Chinese translations."
+        ),
+    }
+    return styles.get(genre, styles["natural_science"])
+
+
 def _build_reflection_prompt(source: str, translation: str, genre: str) -> str:
-    """构建 Reflection 审查提示。"""
-    focus = ["accuracy", "fluency", "terminology", "style"]
-    focus_str = ", ".join(focus)
+    """构建 Reflection 审查提示。包含体裁特定的审查重点。"""
+    genre_focus = {
+        "literature": "Pay special attention to: dialogue naturalness, rhetorical device preservation, emotional tone, idiom adaptation.",
+        "philosophy": "Pay special attention to: logical connective accuracy, term consistency, preservation of ambiguity, sentence structure fidelity.",
+        "natural_science": "Pay special attention to: term accuracy, data/unit preservation, formula integrity, standard Chinese scientific usage.",
+        "social_science": "Pay special attention to: argument structure, citation preservation, statistical accuracy, terminology consistency.",
+        "technical": "Pay special attention to: code/command integrity, API name preservation, technical term accuracy, file path preservation.",
+    }
+    extra = genre_focus.get(genre, "")
 
     return f"""Review this English→Chinese translation ({genre} genre).
+
+{extra}
 
 Source (English):
 {source[:2000]}
@@ -261,8 +364,8 @@ Source (English):
 Translation (Chinese):
 {translation[:2000]}
 
-Check for: {focus_str}.
-Be specific: what exactly is wrong and how to fix it."""
+For each issue found, use format: [TYPE] problem → fix
+If no issues: [OK] Accurate, fluent, and stylistically appropriate."""
 
 
 def _merge_usage(total: dict, usage: dict):
@@ -303,43 +406,42 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
     genre = kg.get("book_metadata", {}).get("genre", config.get("genre", "auto"))
     style = _get_style_instruction(genre)
 
-    system = f"""You are a professional translator specializing in English→Chinese translation.
-Genre: {genre}
-{style}
-
-Translate accurately and naturally. Preserve paragraph breaks.
-
-Output rules:
-1. Return ONLY the translated text, no explanations
-2. Preserve markdown formatting (**, *, ``, etc.)
-3. Proper nouns: translate established ones, keep unfamiliar ones in English
-4. Numbers and dates: keep original format"""
-
+    # 术语表
+    glossary_section = "None provided."
     if glossary:
-        glossary_text = "\nTerminology (prefer these translations):\n"
+        lines = []
         for en, info in list(glossary.items())[:20]:
-            glossary_text += f"  {en} → {info['zh']}"
+            line = f"  {en} → {info['zh']}"
             if info.get("context"):
-                glossary_text += f"  ({info['context']})"
-            glossary_text += "\n"
-        system += "\n" + glossary_text
+                line += f"  ({info['context']})"
+            lines.append(line)
+        glossary_section = "Use these translations consistently:\n" + "\n".join(lines)
 
-    user_parts = []
-
+    # RAT 上下文
+    rat_section = "None available."
     if rat_context:
-        evidence = "Previously translated similar passages (for reference):\n\n"
+        parts = []
         for i, ev in enumerate(rat_context[:3], 1):
-            evidence += f"[Reference {i}]\n"
-            evidence += f"EN: {ev['source'][:400]}...\n"
-            evidence += f"ZH: {ev['target'][:300]}...\n\n"
-        user_parts.append(evidence)
+            parts.append(
+                f"[Example {i}]\n"
+                f"EN: {ev['source'][:300]}...\n"
+                f"ZH: {ev['target'][:250]}..."
+            )
+        rat_section = "Previously translated similar passages — maintain consistent style and terminology:\n\n" + "\n\n".join(parts)
 
-    user_parts.append(
-        f"{SENTENCE_INSTRUCTION}\n\n"
-        f"Translate to Chinese:\n\n{chunk.text}"
+    system = TRANSLATION_SYSTEM_PROMPT.format(
+        genre=genre,
+        style_instruction=style,
+        glossary_section=glossary_section,
+        rat_section=rat_section,
     )
 
-    return system, "\n".join(user_parts)
+    user = TRANSLATION_USER_PROMPT.format(
+        sentence_instruction=SENTENCE_INSTRUCTION,
+        source_text=chunk.text,
+    )
+
+    return system, user
 
 
 def _get_style_instruction(genre: str) -> str:
