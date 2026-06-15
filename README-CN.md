@@ -25,6 +25,8 @@
 
 Itranslation 是一个基于大语言模型的桌面翻译应用，支持将整本书籍从英文翻译为中文。输入 PDF、EPUB、TXT 或 Markdown 文件后，系统通过多阶段流水线处理——包括句子级语义分块、检索增强翻译（RAT）、Agentic 知识图谱预读、术语一致性审计和可选的 Reflection 反思工作流——最终输出 TXT、Markdown、PDF 或 EPUB 格式的译文。
 
+> **知识应该自由流动。** 我们鼓励所有用户将翻译完成的书籍公开发布——上传至 [Internet Archive](https://archive.org)、GitHub、个人博客或任何开放平台。每一本译作，都在拆除读者与知识之间的一道语言隔墙。
+
 ---
 
 ## 核心差异
