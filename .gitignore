@@ -1,0 +1,6 @@
+# Only track books/ on this branch
+*/*
+!.gitignore
+!README.md
+!books/
+!books/*
