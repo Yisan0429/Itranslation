@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.3.2 (2026-06-15)
+## v1.3.1 (2026-06-15)
 
 ### 🚀 新增
 - **稳定性加固** — 单块 API 失败不再崩溃全流程
@@ -17,10 +17,18 @@
   - Revision 提示：修订原则（准确优先/自然中文/流水句）
   - 体裁指令大幅扩展（每体裁 3-5 行详细指导）
 - **GUI 缓存检测** — 翻译前弹窗：清除重译 / 保留续翻 / 取消
+- **十项测试语料库** — `input/test/` 目录 10 个源文件 + `src/test_corpus.py` 参考译文与元数据
+  - 覆盖 5 种体裁：文学(3) / 哲学(1) / 自然科学(3) / 社会科学(2) / 技术(1)
+  - 8 个测试维度：基础翻译/数据保护/格式保护/对话/长句/专有名词/引用/公式代码
 
 ### 🔧 改进
 - GUI 日志区分 ✅ 完成 / ⚠️ 错误，翻译结束后汇总错误块
+- GUI Provider 下拉改为平台名：DeepSeek / OpenAI / Anthropic / Google / Mimo / Custom
+- 模型版本全面更新：GPT-4o→GPT-5.5、Claude Sonnet 4→Opus 4.8、Gemini 2.5→3.5、Mimo V1→V2.5
+- 删除 Groq/Qwen 支持，删除成本估算和已知不足章节
 - README 格式化清理：删除所有 bold 版本标签、EN 版去中文、TBL→TranslateBooksWithLLMs
+- 新增 PyInstaller 构建配置 `Itranslation-cli.spec`，产出 76MB Windows exe
+- `.gitignore` 添加 dist/ 和 *.zip 防护
 
 ## v1.3.0 (2026-06-15)
 
