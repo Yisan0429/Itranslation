@@ -30,6 +30,7 @@ from vector_store import TranslationVectorStore
 from consistency import ConsistencyModel, generate_consistency_report
 from translator import translate_chapter
 from assembler import assemble_translations, assemble_book
+from api_client import call_openai_compatible_chat
 
 console = Console()
 
@@ -232,47 +233,7 @@ def _call_deepseek(cfg: dict, system_prompt: str, user_prompt: str, max_tokens: 
     Returns:
         (translated_text, usage_dict) where usage_dict has prompt_tokens, completion_tokens
     """
-    import urllib.request
-    import urllib.error
-
-    api_key = cfg.get("api_key") or cfg.get("DEEPSEEK_API_KEY", "")
-    if not api_key:
-        raise ValueError("未设置 DEEPSEEK_API_KEY。请设置环境变量或在 config.json 中配置。")
-
-    api_base = cfg.get("api_base", "https://api.deepseek.com/v1")
-    model = cfg.get("model", "deepseek-v4-pro")
-
-    payload = json.dumps({
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        "temperature": cfg.get("temperature", 0.3),
-        "max_tokens": max_tokens,
-        "stream": False,
-    }).encode("utf-8")
-
-    url = f"{api_base}/chat/completions"
-    req = urllib.request.Request(url, data=payload, headers={
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}",
-    })
-
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read())
-            content = result["choices"][0]["message"]["content"]
-            usage = result.get("usage", {})
-            return content.strip(), {
-                "prompt_tokens": usage.get("prompt_tokens", 0),
-                "completion_tokens": usage.get("completion_tokens", 0),
-            }
-    except urllib.error.HTTPError as e:
-        body = e.read().decode() if e.fp else str(e)
-        raise RuntimeError(f"API 错误 ({e.code}): {body[:500]}")
-    except Exception as e:
-        raise RuntimeError(f"API 调用失败: {e}")
+    return call_openai_compatible_chat(cfg, system_prompt, user_prompt, max_tokens=max_tokens)
 
 
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):

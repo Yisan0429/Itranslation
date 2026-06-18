@@ -193,11 +193,14 @@ def _extract_glossary_terms(text: str, glossary: dict) -> list[str]:
 
 def _call_with_retry(llm_call: Callable, system_prompt: str, user_prompt: str, chunk_id: str, config: dict) -> tuple[str, dict]:
     max_retries = config.get("max_retries", 3)
+    network_max_retries = max(config.get("network_max_retries", max_retries), max_retries)
     base_delay = config.get("retry_base_delay", 2)
     max_delay = config.get("retry_max_delay", 60)
 
     last_error = None
-    for attempt in range(max_retries):
+    attempt = 0
+    last_retry_limit = max_retries
+    while True:
         try:
             result, usage = llm_call(system_prompt, user_prompt)
             if not result or not result.strip():
@@ -205,12 +208,18 @@ def _call_with_retry(llm_call: Callable, system_prompt: str, user_prompt: str, c
             return result.strip(), usage
         except Exception as e:
             last_error = e
-            if attempt < max_retries - 1:
+            retry_limit = network_max_retries if getattr(e, "retryable", False) else max_retries
+            last_retry_limit = retry_limit
+
+            if attempt < retry_limit - 1:
                 delay = min(base_delay * (2 ** attempt), max_delay)
                 console.print(f"  [yellow]⚠️ {chunk_id} 第{attempt+1}次失败: {e}，{delay}s 后重试[/yellow]")
                 time.sleep(delay)
+            else:
+                break
+        attempt += 1
 
-    raise RuntimeError(f"{chunk_id} 翻译失败（{max_retries} 次重试后）: {last_error}")
+    raise RuntimeError(f"{chunk_id} 翻译失败（{last_retry_limit} 次重试后）: {last_error}")
 
 
 def _update_consistency(source: str, target: str, glossary: dict, model: ConsistencyModel, chunk_id: str):

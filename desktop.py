@@ -4,7 +4,7 @@ Itranslation — AI 全书翻译工具
 启动: uv run python desktop.py  (或 python desktop.py)
 """
 
-import ctypes, json, os, sys, subprocess, time, traceback
+import ctypes, hashlib, json, os, re, sys, subprocess, time, traceback
 from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════
@@ -24,7 +24,43 @@ def _check_env():
             "   下载: https://www.python.org/downloads/"
         )
 
-    # 2. 检查关键依赖
+    # 2. 检查 GUI 运行所需的 Tk 支持。tkinter 是标准库模块，但部分
+    # Python 发行版会把 _tkinter 拆成独立系统包，无法通过 uv/pip 安装。
+    try:
+        import _tkinter  # noqa: F401
+    except ImportError:
+        py_tag = f"{sys.version_info.major}.{sys.version_info.minor}"
+        if sys.platform == "darwin":
+            fix = (
+                "macOS + Homebrew 修复方法:\n"
+                f"  brew install python-tk@{py_tag}\n"
+                f"  uv venv --python {py_tag} --recreate\n"
+                "  uv sync"
+            )
+        elif sys.platform.startswith("linux"):
+            fix = (
+                "Linux 修复方法:\n"
+                "  # Debian/Ubuntu\n"
+                "  sudo apt install python3-tk\n"
+                "  # Fedora\n"
+                "  sudo dnf install python3-tkinter\n"
+                f"  uv venv --python {py_tag} --recreate\n"
+                "  uv sync"
+            )
+        else:
+            fix = (
+                "修复方法:\n"
+                "  安装带 Tk/Tcl 支持的 Python 3.11+，然后重新创建虚拟环境:\n"
+                f"  uv venv --python {py_tag} --recreate\n"
+                "  uv sync"
+            )
+        errors.append(
+            "❌ 缺少 Tkinter GUI 支持\n"
+            "   当前 Python 未包含 _tkinter 模块，桌面 GUI 无法启动。\n\n"
+            f"{fix}"
+        )
+
+    # 3. 检查关键依赖
     missing_pkgs = []
     for pkg, import_name, desc in [
         ("pymupdf", "fitz", "PDF 文本提取"),
@@ -45,7 +81,7 @@ def _check_env():
             "  uv sync"
         )
 
-    # 3. 检查 uv（如果是 git clone 的新用户可能没装）
+    # 4. 检查 uv（如果是 git clone 的新用户可能没装）
     try:
         subprocess.run(["uv", "--version"], capture_output=True, timeout=5)
     except (FileNotFoundError, subprocess.TimeoutExpired):
@@ -56,7 +92,7 @@ def _check_env():
             "  # 然后运行: uv sync"
         )
 
-    # 4. 检查 config.json
+    # 5. 检查 config.json
     config_path = Path(__file__).parent / "config.json"
     has_config = config_path.exists()
     if has_config:
@@ -76,7 +112,7 @@ def _check_env():
             "获取免费 API Key: https://platform.deepseek.com/"
         )
 
-    # 5. 显示所有错误
+    # 6. 显示所有错误
     if errors:
         print("\n" + "=" * 55)
         print("  Itranslation — 环境检测")
@@ -133,6 +169,7 @@ from chunker import chunk_text, parse_structure
 from translator import translate_chapter
 from assembler import assemble_translations, assemble_book
 from consistency import ConsistencyModel
+from api_client import call_openai_compatible_chat
 
 # ═══════════════════════════════════════════════════════════
 # 配置
@@ -149,22 +186,25 @@ MODELS = {
 CUSTOM_MODEL = {"model":"", "base":"", "key":""}
 
 
+def _failure_message(exc):
+    return str(exc) or type(exc).__name__
+
+
+def _schedule_fail(root, fail_callback, exc):
+    msg = _failure_message(exc)
+    root.after(0, lambda msg=msg: fail_callback(msg))
+
+
+def _gui_checkpoint_path(book_path, chapter_index, chapter_title):
+    resolved = str(Path(book_path).expanduser().resolve())
+    book_hash = hashlib.sha1(resolved.encode("utf-8")).hexdigest()[:10]
+    safe_title = re.sub(r"[^A-Za-z0-9._-]+", "_", chapter_title).strip("._-")
+    safe_title = safe_title[:80] or "chapter"
+    return PROJECT_ROOT / "cache" / f"gui_{book_hash}_{chapter_index:04d}_{safe_title}.json"
+
+
 def call_api(cfg, sp, up, max_tokens=8192):
-    import urllib.request
-    key = cfg.get("api_key","") or os.environ.get("DEEPSEEK_API_KEY","")
-    if not key: raise ValueError("未设置 API Key")
-    payload = json.dumps({
-        "model":cfg.get("model","deepseek-v4-pro"),
-        "messages":[{"role":"system","content":sp},{"role":"user","content":up}],
-        "temperature":cfg.get("temperature",0.3),"max_tokens":max_tokens,"stream":False
-    }).encode()
-    req = urllib.request.Request(f"{cfg.get('api_base','https://api.deepseek.com/v1')}/chat/completions",
-        data=payload,headers={"Content-Type":"application/json","Authorization":f"Bearer {key}"})
-    with urllib.request.urlopen(req, timeout=120) as r:
-        d = json.loads(r.read())
-        return d["choices"][0]["message"]["content"].strip(),{
-            "prompt_tokens":d.get("usage",{}).get("prompt_tokens",0),
-            "completion_tokens":d.get("usage",{}).get("completion_tokens",0)}
+    return call_openai_compatible_chat(cfg, sp, up, max_tokens=max_tokens)
 
 # ═══════════════════════════════════════════════════════════
 class App:
@@ -335,8 +375,10 @@ class App:
             cm=ConsistencyModel()
             def llm(sp,up): return call_api(cfg,sp,up,max_tokens=cfg.get("max_tokens_per_chunk",8192))
             all_trans,done=[],0
-            for title,cks,ct in all_chunks:
-                trans=translate_chapter(title,cks,None,cm,{},{},llm,cfg)
+            for ch_idx,(title,cks,ct) in enumerate(all_chunks):
+                checkpoint_path=_gui_checkpoint_path(path,ch_idx,title)
+                checkpoint_path.parent.mkdir(parents=True,exist_ok=True)
+                trans=translate_chapter(title,cks,None,cm,{},{},llm,cfg,checkpoint_path=str(checkpoint_path))
                 all_trans.append((title,cks,trans,ct)); done+=len(cks)
                 self._update_ui(f"Phase 2: 翻译...",done,total)
                 while self.paused and self.running: time.sleep(0.3)
@@ -351,7 +393,7 @@ class App:
             self.root.after(0,lambda:self._set(self.ov,"\n\n".join(txt for _,txt in full)[:10000]))
             self.output_file=opath; self.root.after(0,lambda:self._done(oname,tc,pt,ct2))
         except Exception as e:
-            self.root.after(0,lambda:self._fail(str(e)))
+            _schedule_fail(self.root,self._fail,e)
     def _done(self,n,c,pt,ct):
         self.running=False;self.paused=False;self.btn.configure(text="开始翻译",state=NORMAL)
         self.pause_btn.configure(state=DISABLED,text="⏸"); self.phase_lbl.configure(text="翻译完成")
