@@ -258,7 +258,7 @@ def _translate_with_reflection(
     genre = config.get("genre", "auto")
 
     # Step 1: 初始翻译
-    initial, usage1 = _call_with_retry(llm_call, system_prompt, user_prompt, chunk.id, config)
+    initial, usage1 = _call_with_retry(llm_call, system_prompt, user_prompt, chunk.id, config, tier="strong")
     total_usage = dict(usage1)
 
     current = initial
@@ -267,7 +267,7 @@ def _translate_with_reflection(
         # Step 2: Reflection — LLM 审查翻译质量
         reflect_user = _build_reflection_prompt(chunk.text, current, genre)
         try:
-            reflection, usage_r = llm_call(REFLECTION_SYSTEM_PROMPT, reflect_user)
+            reflection, usage_r = llm_call(REFLECTION_SYSTEM_PROMPT, reflect_user, tier="cheap")
         except Exception as e:
             console.print(f"  [yellow]⚠️ Reflection 失败: {e}，跳过修订[/yellow]")
             break
@@ -288,7 +288,7 @@ def _translate_with_reflection(
         revision_system = REVISION_SYSTEM_PROMPT.format(reflection_feedback=reflection)
         revision_user = f"Source text:\n{chunk.text}\n\nInitial translation:\n{current}\n\nPlease revise."
         try:
-            revised, usage_v = llm_call(revision_system, revision_user)
+            revised, usage_v = llm_call(revision_system, revision_user, tier="strong")
         except Exception as e:
             console.print(f"  [yellow]⚠️ Revision 失败: {e}，保留当前版本[/yellow]")
             break
@@ -464,10 +464,10 @@ def _extract_glossary_terms(text: str, glossary: dict) -> list[str]:
     return found
 
 
-def _call_with_retry(llm_call: Callable, system_prompt: str, user_prompt: str, chunk_id: str, config: dict) -> tuple[str, dict]:
+def _call_with_retry(llm_call: Callable, system_prompt: str, user_prompt: str, chunk_id: str, config: dict, tier: str = None) -> tuple[str, dict]:
     """API 调用包装器。call_api 已内置重试，此处提供友好错误处理。"""
     try:
-        result, usage = llm_call(system_prompt, user_prompt)
+        result, usage = llm_call(system_prompt, user_prompt, tier=tier)
         if not result or not result.strip():
             raise ValueError("LLM returned empty response")
         return result.strip(), usage
@@ -504,3 +504,4 @@ def _save_checkpoint(path: str, translations: dict, chapter: str, done: int, tot
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+

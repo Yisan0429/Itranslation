@@ -3,7 +3,6 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/version-1.3.3-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
-  <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
 
 <p align="center">
@@ -23,7 +22,7 @@
 
 ## Overview
 
-Itranslation is a desktop application and command-line tool for translating entire books using large language models. It accepts PDF, EPUB, TXT, and Markdown files, processes them through a multi-phase pipeline with sentence-level chunking, retrieval-augmented translation (RAT), agentic knowledge-graph pre-reading, terminology consistency auditing, and an optional reflection workflow — then outputs clean Chinese text in TXT, Markdown, PDF, or EPUB format.
+Itranslation is a desktop application and command-line tool for translating entire books from English to Chinese. It accepts PDF, EPUB, TXT, and Markdown files, processes them through a multi-phase pipeline with sentence-level chunking, agentic knowledge-graph pre-reading, terminology consistency auditing, and an optional reflection workflow — then outputs clean Chinese text in TXT, Markdown, PDF, or EPUB format.
 
 > **Knowledge should be free.** We encourage all users to share their translated books publicly — on [Internet Archive](https://archive.org), [GitHub](https://github.com), personal blogs, or any open platform. Every translation removes a language barrier between a reader and a book.
 
@@ -39,7 +38,6 @@ Itranslation is a desktop application and command-line tool for translating enti
 | Post-Translation QA | Output as-is | Reflection workflow: LLM self-review → revision (translate → reflect → improve) |
 | Interruption Handling | Restart from beginning | Pause/Resume in GUI; checkpoint-based resume in CLI and GUI |
 | Cost Visibility | Unknown until billing | Per-chunk token consumption and cost displayed in real time ($/¥) |
-| Model Flexibility | Hardcoded provider | 5 providers via liteLLM (DeepSeek, OpenAI, Anthropic, Google, Mimo) + custom API |
 | Quality Benchmarking | None | Built-in BLEU/chrF scoring + LLM-as-Judge evaluation suite |
 
 ---
@@ -262,17 +260,14 @@ Itranslation/
 | Reflection Workflow | ✓ | — | — | — | ✓ | — |
 | Format Protection | ✓ | — | — | — | — | — |
 | Cost Tracking | ✓ ($/¥) | — | — | — | — | ✓ |
-| Multi-Provider (liteLLM) | ✓ (5 providers) | ✓ (40+ models) | Multi-engine | OpenAI family | OpenAI | Multi-provider |
 | Bilingual Output | — | ✓ | — | — | — | — |
 | Benchmark Suite | ✓ | — | — | — | — | ✓ |
 | Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | TXT | TXT / EPUB / SRT |
-| Model Support | DeepSeek + liteLLM | 40+ (liteLLM) | Multi-engine | OpenAI family | GPT-5.5 | Ollama, OpenAI, Gemini |
 | Maturity | v1.3 (2026) | 5 years | 3 years | v2 (2025) | Research (2025) | Active (2026) |
 
 ### Unique Advantages
 
 1. Most comprehensive open-source translation quality pipeline. Sentence-level chunking, overlap redundancy, RAT retrieval, KG pre-read, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project. The Reflection workflow adds a translate → reflect → revise cycle adapted from state-of-the-art agentic translation research.
-2. Multi-provider model ecosystem. liteLLM integration provides access to models across 5 providers (DeepSeek, OpenAI, Anthropic, Google, Mimo) with a unified interface, while retaining the zero-dependency direct HTTP path for DeepSeek.
 3. Built-in quality benchmarks. The benchmark suite provides BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style dimensions.
 4. Cost transparency. Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
 5. API with built-in retry. All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
@@ -289,9 +284,6 @@ Can scanned/image-based PDFs be translated?
 
 Yes, using the Marker visual extraction engine. Model files (~2 GB) are downloaded automatically on first use.
 
-Can I use my own LLM provider?
-
-Set `--provider litellm --model <model-id>` for liteLLM, or `--provider custom --api-base <url>` for any OpenAI-compatible API endpoint (Ollama, vLLM, Groq, etc.).
 
 How do I run the environment checker?
 
@@ -322,7 +314,6 @@ Itranslation builds on ideas and inspiration from the following projects, studie
 | [EasyNMT](https://github.com/UKPLab/EasyNMT) | Unified interface for multiple MT engines (v1.0 research) |
 | [translate-shell](https://github.com/soimort/translate-shell) | CLI-first translation UX, multi-provider abstraction (v1.0 research) |
 | [sacrebleu](https://github.com/mjpost/sacrebleu) | BLEU and chrF evaluation metrics for Chinese translation (v1.3.0) |
-| [liteLLM](https://github.com/BerriAI/litellm) | Unified API interface across 100+ LLM providers (v1.3.0) |
 | [NiceGUI](https://github.com/zauberzeug/nicegui) | Desktop GUI framework with browser and native window modes (v1.2.0) |
 | [PyInstaller](https://github.com/pyinstaller/pyinstaller) | Standalone Windows executable packaging (v1.3.1) |
 

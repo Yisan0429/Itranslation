@@ -125,6 +125,8 @@ def main():
                 system_prompt=system_prompt, user_prompt=user_prompt,
                 max_tokens=4096,
                 provider=cfg.get("provider", "deepseek"),
+                tier="fast",
+                llm_tiers=cfg.get("llm_tiers") if cfg.get("use_tiered_models") else None,
             )
 
         kg = build_knowledge_graph(
@@ -212,7 +214,7 @@ def main():
     provider = cfg.get("provider", "deepseek")
     all_errors = []
 
-    def make_llm_call(sp, up):
+    def make_llm_call(sp, up, tier=None):
         return call_api(
             api_key=cfg.get("api_key", ""),
             api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
@@ -220,6 +222,8 @@ def main():
             system_prompt=sp, user_prompt=up,
             max_tokens=cfg.get("max_tokens_per_chunk", 4096),
             provider=provider,
+            tier=tier,
+            llm_tiers=cfg.get("llm_tiers") if cfg.get("use_tiered_models") else None,
         )
 
     all_chapter_translations = []
@@ -247,7 +251,7 @@ def main():
                 cm = ConsistencyModel()
                 checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
 
-                def llm_call(sp, up):
+                def llm_call(sp, up, tier=None):
                     return call_api(
                         api_key=cfg.get("api_key", ""),
                         api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
@@ -255,6 +259,8 @@ def main():
                         system_prompt=sp, user_prompt=up,
                         max_tokens=cfg.get("max_tokens_per_chunk", 4096),
                         provider=provider,
+                        tier=tier,
+                        llm_tiers=cfg.get("llm_tiers") if cfg.get("use_tiered_models") else None,
                     )
 
                 trans, errs = translate_chapter(

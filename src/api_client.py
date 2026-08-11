@@ -30,6 +30,9 @@ def call_api(
     retry_base_delay: float = 2.0,
     retry_max_delay: float = 30.0,
     provider: str = "deepseek",
+    tier: str = None,
+    llm_tiers: dict = None,
+    extra_body: dict = None,
 ) -> tuple[str, dict]:
     """调用 LLM API，带重试。
 
@@ -45,10 +48,22 @@ def call_api(
         retry_base_delay: 重试基础延迟（秒）
         retry_max_delay: 重试最大延迟（秒）
         provider: 提供商类型 — "deepseek" | "litellm" | "custom"
+        tier: 可选的三档模型标识 ("strong"|"cheap"|"fast")，优先级高于 model 参数
+        llm_tiers: 三档模型配置 dict，key 为 tier 名，value 含 model 和 reasoning_effort
+        extra_body: 额外的请求体字段（如 {"reasoning_effort": "high"}）
 
     Returns:
         (response_text, usage_dict) — usage_dict 含 prompt_tokens, completion_tokens
     """
+    # Resolve tier → model + extra_body overrides
+    if tier and llm_tiers and tier in llm_tiers:
+        tier_cfg = llm_tiers[tier]
+        model = tier_cfg.get("model", model)
+        if tier_cfg.get("reasoning_effort"):
+            if extra_body is None:
+                extra_body = {}
+            extra_body.setdefault("reasoning_effort", tier_cfg["reasoning_effort"])
+
     if provider == "litellm":
         return _call_via_litellm(
             model=model,
@@ -72,6 +87,7 @@ def call_api(
             max_retries=max_retries,
             retry_base_delay=retry_base_delay,
             retry_max_delay=retry_max_delay,
+            extra_body=extra_body,
         )
 
 
@@ -86,12 +102,13 @@ def _call_via_http(
     max_retries: int,
     retry_base_delay: float,
     retry_max_delay: float,
+    extra_body: dict = None,
 ) -> tuple[str, dict]:
     """直连 OpenAI 兼容 API（urllib 实现，无第三方依赖）。"""
     if not api_key:
         raise ValueError("未设置 API Key。请设置环境变量或配置 api_key。")
 
-    payload = json.dumps({
+    payload_dict = {
         "model": model,
         "messages": [
             {"role": "system", "content": system_prompt},
@@ -100,7 +117,10 @@ def _call_via_http(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": False,
-    }).encode("utf-8")
+    }
+    if extra_body:
+        payload_dict.update(extra_body)
+    payload = json.dumps(payload_dict).encode("utf-8")
 
     url = f"{api_base}/chat/completions"
     headers = {
@@ -213,3 +233,4 @@ def get_available_litellm_models() -> list[str]:
         "mistral/mistral-large-latest",
         "mistral/mistral-small-latest",
     ]
+

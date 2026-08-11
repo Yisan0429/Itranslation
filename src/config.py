@@ -35,6 +35,28 @@ DEFAULT_CONFIG = {
     # 格式: "openai/gpt-4o", "anthropic/claude-sonnet-4-20250514", "gemini/gemini-2.5-pro"
     "litellm_model": "deepseek/deepseek-chat",
 
+    # === 三档模型策略（Wenyi 风格） ===
+    # 按任务重要性分三档：
+    #   strong: 翻译/润色 — deepseek-v4-pro（最高质量）
+    #   cheap:  审校/一致性QA — deepseek-v4-flash（判断类，开思考）
+    #   fast:   预读/术语抽取 — deepseek-v4-flash（机械任务，关思考省钱）
+    # 未配置 llm_tiers 时回退到单模型 "model"。
+    "use_tiered_models": True,
+    "llm_tiers": {
+        "strong": {
+            "model": "deepseek-v4-pro",
+            "reasoning_effort": "high",
+        },
+        "cheap": {
+            "model": "deepseek-v4-flash",
+            "reasoning_effort": "high",
+        },
+        "fast": {
+            "model": "deepseek-v4-flash",
+            "reasoning_effort": "low",
+        },
+    },
+
     # === 翻译 ===
     "source_lang": "en",
     "target_lang": "zh",
@@ -145,7 +167,7 @@ def calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: d
     if rate is None:
         return None, f"{prompt_tokens:,}+{completion_tokens:,} tokens (自定义模型，费用未知)"
     cost = prompt_tokens / 1_000_000 * rate["input"] + completion_tokens / 1_000_000 * rate["output"]
-    return cost, f"{prompt_tokens:,}+{completion_tokens:,} tokens · ${cost:.4f} (~¥{cost * 7.2:.2f})"
+    return cost, f"{prompt_tokens:,}+{completion_tokens:,} tokens ·  (~¥{cost * 7.2:.2f})"
 
 
 # 常用模型预设（GUI 下拉列表用）
@@ -171,3 +193,4 @@ MODEL_PRESETS = [
     # Custom
     {"provider_label": "Custom", "provider": "custom", "model": "", "label": "自定义 API..."},
 ]
+

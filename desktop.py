@@ -64,6 +64,7 @@ state = {
 # UI 构建
 # ═══════════════════════════════════════════════════════
 
+@ui.page("/api/output_dir")
 @ui.page("/")
 def main_page():
     with ui.header(elevated=True).classes("bg-gray-100 text-black"):
@@ -260,12 +261,15 @@ async def _on_file_upload(e):
     state["file_box"].set_text(fname)
     ui.notify(f"已选择: {fname}", type="positive")
 
-    # 原文预览
-    try:
-        text = fpath.read_text(encoding="utf-8")[:3000]
-    except Exception:
-        text = f"(预览不可用: {fname})"
-    state["source_area"].set_text(text)
+    # 原文预览（异步读取，避免阻塞 UI）
+    async def _load_preview():
+        try:
+            text = fpath.read_text(encoding="utf-8")[:3000]
+        except Exception:
+            text = f"(预览不可用: {fname})"
+        state["source_area"].set_text(text)
+    asyncio.create_task(_load_preview())
+
 
 
 def _clear_file():
@@ -631,7 +635,8 @@ def _run_translation_pipeline():
     state["progress"] = 0.88
 
     book_name = book_path.stem
-    out_dir = state["output_box"].value or "output"
+    out_dir_raw = state["output_box"].value or "output"
+    out_dir = str(PROJECT_ROOT / out_dir_raw)
     output_path = str(PROJECT_ROOT / out_dir / book_name / f"{book_name}.{state['output_format']}")
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 

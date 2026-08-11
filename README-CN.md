@@ -3,7 +3,6 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/version-1.3.3-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
-  <img src="https://img.shields.io/badge/LLM-DeepSeek%20V4-536DFE?logo=deepseek" alt="DeepSeek">
 </p>
 
 <p align="center">
@@ -39,7 +38,7 @@ Itranslation 是一个基于大语言模型的桌面翻译应用，支持将整�
 | 译后 QA | 直接输出 | Reflection 反思工作流：LLM 自审 → 修订（翻译 → 反思 → 改进） |
 | 中断处理 | 重新开始 | GUI 暂停/恢复；CLI 与 GUI 均支持断点续传 |
 | 成本可见性 | 结算时才知道 | 每块翻译后实时显示 token 消耗和费用（$/¥） |
-| 模型灵活性 | 硬编码单一服务商 | 5 大平台 via liteLLM（DeepSeek、OpenAI、Anthropic、Google、Mimo）+ 自定义 API |
+
 | 质量基准测试 | 无 | 内置 BLEU/chrF 评分 + LLM-as-Judge 评估套件 |
 
 ---
@@ -266,13 +265,11 @@ Itranslation/
 | 双语输出 | — | ✓ | — | — | — | — |
 | Benchmark 套件 | ✓ | — | — | — | — | ✓ |
 | 输出格式 | TXT / MD / PDF / EPUB | 双语 EPUB / TXT | 20 种 | EPUB / TXT | TXT | TXT / EPUB / SRT |
-| 模型支持 | DeepSeek + liteLLM | 40+（liteLLM） | 多引擎 | OpenAI 系列 | GPT-5.5 | Ollama, OpenAI, Gemini |
 | 成熟度 | v1.3（2026） | 5 年 | 3 年 | v2（2025） | 研究阶段（2025） | 活跃（2026） |
 
 ### 差异化优势
 
 1. 最全面的开源翻译质量管线。句子级分块、重叠冗余、RAT 检索、KG 预读和实时术语审计形成完整质量闭环，所有竞品均不同时具备。Reflection 反思工作流融入前沿 Agentic 翻译研究成果，实现翻译 → 反思 → 修订循环。
-2. 多平台模型生态。liteLLM 集成提供 5 大平台（DeepSeek、OpenAI、Anthropic、Google、Mimo）模型的统一接口，同时保留 DeepSeek 直连 HTTP 通道。
 3. 内置质量基准测试。benchmark 套件提供 BLEU/chrF 自动评分和 LLM-as-Judge 四维质量评估。
 4. 成本透明可控。token 消耗和预估费用（美元/人民币双币种）实时更新。自定义模型明确标注，不显示错误定价。
 5. API 内置重试。所有 LLM API 调用均内置指数退避重试机制（可通过 config.json 配置），确保网络波动时的稳定性。
@@ -291,7 +288,7 @@ CLI 在每章完成后保存进度。中断后重新翻译同一文件，系统�
 
 能否使用自己的模型服务？
 
-通过 `--provider litellm --model <model-id>` 使用 liteLLM，或 `--provider custom --api-base <url>` 配置任何 OpenAI 兼容 API（Ollama、vLLM、Groq 等）。
+
 
 如何检测可选功能是否就绪？
 
