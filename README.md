@@ -110,17 +110,6 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 - PDF — Typeset PDF with embedded CJK font (auto-detected per platform)
 - EPUB — Standard e-book format with chapter navigation
 
-### Translation Models
-
-| Provider | Model | Input Price | Output Price | Best For |
-|---|---|---|---|---|
-| DeepSeek | V4 Pro / V4 Flash | $0.14–0.435 | $0.28–0.87 | Best cost-quality ratio |
-| OpenAI | GPT-5.5 / GPT-5.5 Mini | $1.50–5.00 | $6.00–15.00 | Highest general quality |
-| Anthropic | Opus 4.8 / Sonnet 4.6 / Fable 5 | $3.00–10.00 | $15.00–50.00 | Literary nuance; complex reasoning |
-| Google | Gemini 3.5 Pro / 3.5 Flash | $0.30–3.50 | $1.50–10.50 | Long documents; speed |
-| Mimo | MiMo-V2.5-Pro / MiMo-V2.5 | $0.40–1.20 | $1.60–4.80 | Multimodal understanding |
-| Custom | — | — | — | Any OpenAI-compatible API |
-
 ### Reflection Workflow
 
 When enabled, each translated chunk goes through an additional quality loop:
