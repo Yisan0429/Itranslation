@@ -403,8 +403,10 @@ async def _start_translation():
     while t.is_alive():
         await asyncio.sleep(0.25)
 
+    # 无论成功失败，恢复 UI 状态；错误通过 notify 与日志呈现
     if errors:
-        raise errors[0]
+        ui.notify(f"翻译失败: {errors[0]}", type="negative", timeout=0)
+        _log(f"❌ 翻译失败: {errors[0]}")
 
     state["translating"] = False
     state["start_btn"].set_enabled(True)
@@ -412,7 +414,7 @@ async def _start_translation():
     state["cancel_btn"].set_visibility(False)
     state["_timer"].deactivate()
 
-    if state.get("output_path"):
+    if not errors and state.get("output_path"):
         state["download_btn"].set_visibility(True)
 
 
@@ -551,13 +553,16 @@ def _run_translation_pipeline():
         def translate_one(title, chunks_list):
             cm = ConsistencyModel()
             checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
-            return do_chapter(
+            trans, errs = do_chapter(
                 chapter_title=title, chunks=chunks_list,
                 vector_store=vector_store,
                 consistency_model=cm, glossary=glossary, kg=kg,
                 llm_call=llm_translate, config=cfg_local,
                 checkpoint_path=checkpoint_path, cost_lock=cost_lock,
             )
+            return title, chunks_list, trans, errs, cm
+
+        consistency_lock = th.Lock()
 
         with ThreadPoolExecutor(max_workers=actual_parallel) as pool:
             futures = {pool.submit(translate_one, t, c): t for t, c in all_chapter_chunks}
@@ -565,10 +570,17 @@ def _run_translation_pipeline():
                 if state["cancel_flag"]:
                     pool.shutdown(wait=False, cancel_futures=True)
                     return
-                title = futures[fut]
-                trans, errs = fut.result()
-                all_translations.append((title, all_chapter_chunks[0][1], trans))
+                title, chunks_list, trans, errs, cm = fut.result()
+                all_translations.append((title, chunks_list, trans))
                 all_errors.extend(errs)
+                # 合并各线程的一致性统计到共享模型（跨章术语一致性）
+                with consistency_lock:
+                    for term_en, usages in cm.term_usage.items():
+                        base = consistency_model.term_usage.setdefault(term_en, {})
+                        for zh, count in usages.items():
+                            base[zh] = base.get(zh, 0) + count
+                    for term_en, locs in cm.term_locations.items():
+                        consistency_model.term_locations.setdefault(term_en, []).extend(locs)
                 done_chunks += len(trans)
                 state["progress"] = 0.10 + 0.75 * (done_chunks / max(total_chunks, 1))
                 state["current_chapter"] = f"翻译中: {title} ({done_chunks}/{total_chunks})"
