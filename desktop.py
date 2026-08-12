@@ -8,6 +8,7 @@ Itranslation Desktop GUI — NiceGUI + pywebview 原生窗口。
 
 import sys
 import os
+import io
 import json
 import asyncio
 import threading
@@ -152,6 +153,8 @@ def _build_control_panel():
             placeholder="https://api.deepseek.com/v1",
             on_change=lambda e: state.update(api_base=e.value),
         ).classes("w-full")
+
+        ui.button("Save API Config", on_click=_save_api_config).classes("text-xs mt-1")
 
         with ui.row().classes("gap-3 mt-2"):
             ui.switch("Pre-read", value=False,
@@ -309,6 +312,24 @@ async def _ask_clear_cache(book_name: str, checkpoints: list, outputs: list) -> 
 
 def _set_result(container: dict, value):
     container["value"] = value
+
+
+def _save_api_config():
+    """保存当前 API 配置到 config.json（仅覆盖 API 相关字段）。"""
+    cfg_path = PROJECT_ROOT / "config.json"
+    existing = {}
+    if cfg_path.exists():
+        try:
+            existing = json.loads(io.open(cfg_path, encoding="utf-8").read())
+        except (json.JSONDecodeError, OSError):
+            existing = {}
+    existing["provider"] = state["provider"]
+    existing["model"] = state["model"]
+    existing["api_key"] = state["api_key"]
+    existing["api_base"] = state["api_base"]
+    io.open(cfg_path, "w", encoding="utf-8").write(
+        json.dumps(existing, ensure_ascii=False, indent=2))
+    ui.notify("API configuration saved to config.json", type="positive")
 
 
 def _log(msg):

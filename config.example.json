@@ -1,0 +1,6 @@
+{
+    "provider": "custom",
+    "model": "deepseek-v4-pro",
+    "api_key": "sk-your-api-key",
+    "api_base": "https://api.deepseek.com/v1"
+}

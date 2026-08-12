@@ -67,7 +67,7 @@ uv run python translate_book.py book.pdf --genre literature --format pdf     # �
 
 ## API 配置
 
-配置优先级（从高到低）：CLI 参数 > GUI 输入框 > config.json > 环境变量。
+从模板创建配置：`cp config.example.json config.json`，填入密钥即可。配置优先级（从高到低）：CLI 参数 > GUI 输入框 > config.json > 环境变量。
 
 ### 两种提供商模式
 

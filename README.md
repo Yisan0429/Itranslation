@@ -67,7 +67,7 @@ uv run python translate_book.py book.pdf --genre literature --format pdf     # C
 
 ## API Configuration
 
-Configuration precedence (highest first): CLI flags > GUI inputs > `config.json` > environment variables.
+Create your config from the template: `cp config.example.json config.json`, then fill in your key. Configuration precedence (highest first): CLI flags > GUI inputs > `config.json` > environment variables.
 
 ### Provider modes
 
