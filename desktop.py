@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from nicegui import ui, app, run
 from config import load_config, MODEL_PRESETS
-from pipeline import run_translation_pipeline
+from pipeline import run_translation_pipeline, slugify
 
 # ═══════════════════════════════════════════════════════
 # 全局状态
@@ -348,7 +348,7 @@ async def _start_translation():
     # 检查是否有旧的 checkpoint/输出
     book_name = Path(fp).stem
     cache_dir = PROJECT_ROOT / "cache"
-    existing_checkpoints = list(cache_dir.glob(f"checkpoint_*.json"))
+    existing_checkpoints = list(cache_dir.glob(f"checkpoint_{slugify(book_name)}__*.json"))
     existing_output = list((PROJECT_ROOT / "output" / book_name).glob(f"{book_name}.*")) if (PROJECT_ROOT / "output" / book_name).exists() else []
 
     if existing_checkpoints or existing_output:

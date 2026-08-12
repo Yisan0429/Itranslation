@@ -13,7 +13,15 @@ from api_client import call_api
 from vector_store import TranslationVectorStore
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+import re
 PROJECT_ROOT=Path(__file__).parent.parent.resolve()
+def slugify(book_name: str) -> str:
+    """把书名转为安全的 checkpoint 文件名片段（保留中英文与数字）。"""
+    slug = re.sub(r'[^\w一-鿿-]+', '_', book_name, flags=re.UNICODE).strip('_')[:40]
+    return slug or 'book'
+def checkpoint_path_for(book_name: str, chapter_index: int) -> str:
+    """checkpoint 路径：按书名 slug + 章节索引命名，跨书不冲突。"""
+    return str(PROJECT_ROOT/'cache'/f'checkpoint_{slugify(book_name)}__{chapter_index:03d}.json')
 def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=None)->dict:
  log=log_fn or print; progress=progress_fn or (lambda f,m:log(m)); cancel=cancel_fn or (lambda:False); started=time.time(); cfg=params['config']; book=Path(params['book']); errors=[]; cfg.setdefault('_cost',{}); cfg['_cost'].setdefault('prompt_tokens',0); cfg['_cost'].setdefault('completion_tokens',0)
  if not book.exists(): raise FileNotFoundError(str(book))
@@ -34,8 +42,8 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   if params.get('clear_cache',False): vs.initialize(); vs.clear()
  provider=cfg.get('provider','deepseek'); cost_lock=threading.Lock(); consistency_lock=threading.Lock()
  def llm(sp,up,tier=None): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=cfg.get('max_tokens_per_chunk',4096),provider=provider,tier=tier,llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
- def one(title,chunks):
-  cm=ConsistencyModel(); tr,er=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs,consistency_model=cm,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=str(PROJECT_ROOT/'cache'/f'checkpoint_{title}.json'),cost_lock=cost_lock)
+ def one(title,chunks,idx=0):
+  cm=ConsistencyModel(); tr,er=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs,consistency_model=cm,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=checkpoint_path_for(book.stem,idx),cost_lock=cost_lock)
   with consistency_lock:
    for term,usages in cm.term_usage.items():
     target=shared.term_usage.setdefault(term,{})
@@ -45,13 +53,13 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
  workers=params.get('parallel',0) or cfg.get('parallel_workers',0)
  if workers>1 and len(groups)>1:
   with ThreadPoolExecutor(max_workers=workers) as pool:
-   fs=[pool.submit(one,t,c) for t,c in groups]
+   fs=[pool.submit(one,t,c,i) for i,(t,c) in enumerate(groups)]
    for f in as_completed(fs):
     t,c,tr,er=f.result(); results.append((t,c,tr)); errors.extend(er); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),t)
  else:
-  for t,c in groups:
+  for idx,(t,c) in enumerate(groups):
    if cancel(): return _result(None,chapters,groups,[],errors,started,cfg,est_tokens=est_tokens,est_cost=est_cost)
-   t,c,tr,er=one(t,c); results.append((t,c,tr)); errors.extend(er); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),t)
+   t,c,tr,er=one(t,c,idx); results.append((t,c,tr)); errors.extend(er); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),t)
  if errors:
   log(f'翻译错误 ({len(errors)} 个块):')
   for e in errors[:10]: log(f"  {e.get('chapter','?')}/{e.get('chunk_id','?')}: {e.get('error',e)}")
