@@ -311,9 +311,9 @@ def _set_result(container: dict, value):
     container["value"] = value
 
 
-def _log(msg: str):
+def _log(msg):
     """添加日志。"""
-    state["log_lines"].append(msg)
+    state["log_lines"].append(str(msg))
     if state.get("log_area"):
         state["log_area"].value = "\n".join(state["log_lines"])
 
