@@ -219,7 +219,7 @@ def _on_provider_change(provider_label: str):
     actual_provider = presets[0]["provider"]
     state["provider"] = actual_provider
 
-    if actual_provider == "custom":
+    if provider_label == "Custom":
         state["model_select"].set_visibility(False)
         state["model_input"].set_visibility(True)
         state["model_input"].value = ""
