@@ -120,7 +120,7 @@ uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4
 
 ### GUI
 
-在左侧面板填写 Provider / 模型 / API Key / API Base，仅在当前会话生效，不持久化。
+在左侧面板填写 Model / API Key / API Base，点击 **Save API Config** 持久化到 config.json。模型名带 `前缀/名`（如 `openai/gpt-5.5`）时自动走 liteLLM；裸模型名走 OpenAI 兼容直连。
 
 ---
 

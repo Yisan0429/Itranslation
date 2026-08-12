@@ -20,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from nicegui import ui, app, run
-from config import load_config, MODEL_PRESETS
+from config import load_config
 from pipeline import run_translation_pipeline, slugify
 
 # ═══════════════════════════════════════════════════════
@@ -118,27 +118,13 @@ def _build_control_panel():
                     on_change=lambda e: state.update(parallel=0 if e.value == "Auto" else int(e.value)),
                 ).classes("w-full")
 
-        # Provider + 模型
-        ui.label("Provider").classes("text-xs text-gray-500 mt-1")
-        with ui.row().classes("w-full gap-2"):
-            # 平台下拉（DeepSeek / OpenAI / Anthropic / Google / Mimo / Custom）
-            provider_labels = list(dict.fromkeys(p["provider_label"] for p in MODEL_PRESETS))
-            ui.select(
-                options=provider_labels,
-                value="DeepSeek",
-                on_change=lambda e: _on_provider_change(e.value),
-            ).classes("flex-1")
-            # 模型下拉（根据所选平台动态更新）
-            state["model_select"] = ui.select(
-                options=[p["label"] for p in MODEL_PRESETS if p["provider_label"] == "DeepSeek"],
-                value="V4 Pro",
-                on_change=lambda e: _on_model_select(e.value),
-            ).classes("flex-1")
-        state["model_input"] = ui.input(value="",
-            placeholder="Enter model name (e.g. openai/gpt-5.5)",
-            on_change=lambda e: state.update(model=e.value))
-        state["model_input"].classes("w-full mt-1")
-        state["model_input"].set_visibility(False)
+        # Model 名称（带 "前缀/名" 时自动走 liteLLM，裸名走 OpenAI 兼容直连）
+        ui.label("Model").classes("text-xs text-gray-500 mt-1")
+        state["model_input"] = ui.input(
+            value=state["model"],
+            placeholder="deepseek-v4-pro 或 openai/gpt-5.5",
+            on_change=lambda e: state.update(model=e.value),
+        ).classes("w-full")
 
         ui.label("API Key").classes("text-xs text-gray-500 mt-1")
         state["api_key_input"] = ui.input(
@@ -207,39 +193,6 @@ def _build_preview_panel():
 
         state["log_area"] = ui.textarea(value="", label="Log")\
             .props("readonly outlined dense").classes("w-full text-2xs")
-
-
-def _on_provider_change(provider_label: str):
-    """切换平台时更新模型下拉列表。"""
-    # 查找该平台的实际 provider 类型
-    presets = [p for p in MODEL_PRESETS if p["provider_label"] == provider_label]
-    if not presets:
-        return
-
-    actual_provider = presets[0]["provider"]
-    state["provider"] = actual_provider
-
-    if provider_label == "Custom":
-        state["model_select"].set_visibility(False)
-        state["model_input"].set_visibility(True)
-        state["model_input"].value = ""
-        state["model"] = ""
-    else:
-        labels = [p["label"] for p in presets]
-        state["model_select"].options = labels
-        state["model_select"].value = labels[0]
-        state["model_select"].set_visibility(True)
-        state["model_input"].set_visibility(False)
-        # 同步 model ID
-        state["model"] = presets[0]["model"]
-
-
-def _on_model_select(label: str):
-    """模型下拉选择时更新 model ID。"""
-    for p in MODEL_PRESETS:
-        if p["label"] == label:
-            state["model"] = p["model"]
-            return
 
 
 # ═══════════════════════════════════════════════════════
@@ -323,8 +276,9 @@ def _save_api_config():
             existing = json.loads(io.open(cfg_path, encoding="utf-8").read())
         except (json.JSONDecodeError, OSError):
             existing = {}
-    existing["provider"] = state["provider"]
-    existing["model"] = state["model"]
+    _m = (state["model"] or "").strip()
+    existing["provider"] = "litellm" if "/" in _m and not _m.startswith(("http", "https")) else "custom"
+    existing["model"] = _m
     existing["api_key"] = state["api_key"]
     existing["api_base"] = state["api_base"]
     io.open(cfg_path, "w", encoding="utf-8").write(
@@ -441,6 +395,9 @@ def _run_translation_pipeline():
     cfg_local["model"] = state["model"]
     cfg_local["api_key"] = state["api_key"]
     cfg_local["api_base"] = state["api_base"]
+    _model = (state["model"] or "").strip()
+    cfg_local["provider"] = "litellm" if "/" in _model and not _model.startswith(("http", "https")) else "custom"
+    cfg_local["model"] = _model or cfg_local.get("model", "deepseek-v4-pro")
     cfg_local["genre"] = state["genre"]
     cfg_local["parallel_workers"] = state["parallel"]
     cfg_local["enable_agentic_preread"] = state["enable_preread"]

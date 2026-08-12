@@ -120,7 +120,7 @@ uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4
 
 ### GUI
 
-Fill in Provider / Model / API Key / API Base in the left panel. Values apply to the current session and are not persisted.
+Fill in Model / API Key / API Base in the left panel, then click **Save API Config** to persist them to `config.json`. A model name with a `provider/name` prefix (e.g. `openai/gpt-5.5`) is routed through liteLLM; a bare name uses the OpenAI-compatible direct path.
 
 ---
 
