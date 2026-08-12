@@ -9,7 +9,6 @@ Itranslation Desktop GUI — NiceGUI + pywebview 原生窗口。
 import sys
 import os
 import json
-import time
 import asyncio
 import threading
 from pathlib import Path
@@ -20,12 +19,8 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from nicegui import ui, app, run
-from config import load_config, calc_cost, MODEL_PRESETS
-from extractor import extract_book
-from chunker import chunk_text, parse_structure
-from format_protector import protect, restore
-from assembler import assemble_translations, assemble_book
-from consistency import ConsistencyModel, generate_consistency_report
+from config import load_config, MODEL_PRESETS
+from pipeline import run_translation_pipeline
 
 # ═══════════════════════════════════════════════════════
 # 全局状态
@@ -419,8 +414,7 @@ async def _start_translation():
 
 
 def _run_translation_pipeline():
-    """在后台线程中运行完整翻译管线。"""
-    start_time = time.time()
+    """在后台线程中运行完整翻译管线（统一入口 src/pipeline.py）。"""
     cfg_local = load_config()
     cfg_local["provider"] = state["provider"]
     cfg_local["model"] = state["model"]
@@ -431,254 +425,49 @@ def _run_translation_pipeline():
     cfg_local["enable_agentic_preread"] = state["enable_preread"]
     cfg_local["enable_reflection"] = state["enable_reflection"]
 
-    # 自动并行数：0 = 按章节数自动
-    actual_parallel = state["parallel"]
-    if actual_parallel == 0:
-        import os
-        actual_parallel = min(8, max(1, os.cpu_count() or 4))
-
-    book_path = Path(state["file_path"])
-
-    # Phase 0: 提取
-    _log(f"📄 提取: {book_path.name}")
-    state["current_chapter"] = "Phase 0: 提取文本..."
-    state["progress"] = 0.02
-
-    book_md = extract_book(str(book_path), use_vision=state["use_vision"])
-
-    # 格式保护
-    book_md, placeholders = protect(book_md, verbose=False)
-    if placeholders:
-        _log(f"🛡️ 格式保护: {len(placeholders)} 个占位符")
-
-    # 解析章节
-    chapters = parse_structure(book_md)
-    _log(f"📖 {len(chapters)} 章")
-    state["progress"] = 0.05
-
-    # Phase 1: 分块
-    state["current_chapter"] = "Phase 1: 语义分块..."
-    overlap = cfg_local["overlap_by_genre"].get(cfg_local["genre"], 3)
-
-    all_chapter_chunks = []
-    for ch_idx, chapter in enumerate(chapters):
-        if state["cancel_flag"]:
-            _log("⚠️ 用户取消翻译")
-            return
-        chapter_text = "\n\n".join(chapter.get("paragraphs", []))
-        if not chapter_text.strip():
-            continue
-        chunks = chunk_text(
-            chapter_text,
-            target_tokens=cfg_local.get("chunk_target_tokens", 1500),
-            max_tokens=cfg_local.get("chunk_max_tokens", 3000),
-            overlap_sentences=overlap,
-        )
-        all_chapter_chunks.append((chapter["title"], chunks))
-
-    total_chunks = sum(len(c) for _, c in all_chapter_chunks)
-    _log(f"✂️ {total_chunks} 块 (重叠 {overlap} 句)")
-
-    # Phase 2: 翻译
-    state["current_chapter"] = "Phase 2: 翻译中..."
-    state["progress"] = 0.10
-
-    import threading as th
-    from api_client import call_api
-
-    consistency_model = ConsistencyModel()
-
-    # 初始化 RAT
-    vector_store = None
-    if state["enable_rat"]:
-        try:
-            from vector_store import TranslationVectorStore
-            vector_store = TranslationVectorStore(
-                persist_dir=cfg_local["vector_store_dir"]
-            )
-            _log("📚 RAT 向量存储已初始化")
-        except Exception as e:
-            _log(f"⚠️ RAT 初始化失败: {e}")
-
-    # KG 预读
-    glossary = {}
-    kg = {}
-    if state["enable_preread"]:
-        _log("🧠 Agentic Pre-Read...")
-        from kg_builder import build_knowledge_graph, kg_to_glossary
-
-        def llm_kg(sp, up):
-            return call_api(
-                api_key=state["api_key"],
-                api_base=state["api_base"],
-                model=cfg_local["model"],
-                system_prompt=sp, user_prompt=up,
-                max_tokens=4096,
-                provider=state["provider"],
-            )
-
-        try:
-            kg = build_knowledge_graph(book_md, llm_kg,
-                                        sample_ratio=0.1, max_sample_tokens=30000)
-            glossary = kg_to_glossary(kg)
-            if cfg_local["genre"] == "auto":
-                cfg_local["genre"] = kg.get("book_metadata", {}).get("genre", "natural_science")
-            _log(f"  体裁: {cfg_local['genre']}, 术语: {len(glossary)} 个")
-        except Exception as e:
-            _log(f"⚠️ 预读失败: {e}")
-
-    # LLM 翻译函数
-    def llm_translate(sp, up, tier=None):
-        return call_api(
-            api_key=state["api_key"],
-            api_base=state["api_base"],
-            model=cfg_local["model"],
-            system_prompt=sp, user_prompt=up,
-            max_tokens=cfg_local.get("max_tokens_per_chunk", 4096),
-            provider=state["provider"],
-            tier=tier,
-            llm_tiers=cfg_local.get("llm_tiers") if cfg_local.get("use_tiered_models") else None,
-        )
-
-    cost_lock = th.Lock()
-    from translator import translate_chapter as do_chapter
-
-    all_translations = []
-    all_errors = []
-    done_chunks = 0
-
-    if actual_parallel > 1 and len(all_chapter_chunks) > 1:
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-
-        def translate_one(title, chunks_list):
-            cm = ConsistencyModel()
-            checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
-            trans, errs = do_chapter(
-                chapter_title=title, chunks=chunks_list,
-                vector_store=vector_store,
-                consistency_model=cm, glossary=glossary, kg=kg,
-                llm_call=llm_translate, config=cfg_local,
-                checkpoint_path=checkpoint_path, cost_lock=cost_lock,
-            )
-            return title, chunks_list, trans, errs, cm
-
-        consistency_lock = th.Lock()
-
-        with ThreadPoolExecutor(max_workers=actual_parallel) as pool:
-            futures = {pool.submit(translate_one, t, c): t for t, c in all_chapter_chunks}
-            for fut in as_completed(futures):
-                if state["cancel_flag"]:
-                    pool.shutdown(wait=False, cancel_futures=True)
-                    return
-                title, chunks_list, trans, errs, cm = fut.result()
-                all_translations.append((title, chunks_list, trans))
-                all_errors.extend(errs)
-                # 合并各线程的一致性统计到共享模型（跨章术语一致性）
-                with consistency_lock:
-                    for term_en, usages in cm.term_usage.items():
-                        base = consistency_model.term_usage.setdefault(term_en, {})
-                        for zh, count in usages.items():
-                            base[zh] = base.get(zh, 0) + count
-                    for term_en, locs in cm.term_locations.items():
-                        consistency_model.term_locations.setdefault(term_en, []).extend(locs)
-                done_chunks += len(trans)
-                state["progress"] = 0.10 + 0.75 * (done_chunks / max(total_chunks, 1))
-                state["current_chapter"] = f"翻译中: {title} ({done_chunks}/{total_chunks})"
-                if errs:
-                    _log(f"⚠️ {title}: {len(trans)} 块, {len(errs)} 错误")
-                else:
-                    _log(f"✅ {title}: {len(trans)} 块")
-
-                cost = cfg_local.get("_cost", {})
-                pt = cost.get("prompt_tokens", 0)
-                ct = cost.get("completion_tokens", 0)
-                cost_val, _ = calc_cost(cfg_local["model"], pt, ct)
-                state["cost_dollars"] = cost_val
-                state["elapsed_sec"] = time.time() - start_time
-    else:
-        for title, chunks_list in all_chapter_chunks:
-            if state["cancel_flag"]:
-                return
-            checkpoint_path = str(PROJECT_ROOT / "cache" / f"checkpoint_{title}.json")
-            trans, errs = do_chapter(
-                chapter_title=title, chunks=chunks_list,
-                vector_store=vector_store,
-                consistency_model=consistency_model, glossary=glossary, kg=kg,
-                llm_call=llm_translate, config=cfg_local,
-                checkpoint_path=checkpoint_path, cost_lock=cost_lock,
-            )
-            all_translations.append((title, chunks_list, trans))
-            all_errors.extend(errs)
-            done_chunks += len(trans)
-            state["progress"] = 0.10 + 0.75 * (done_chunks / max(total_chunks, 1))
-            state["current_chapter"] = f"翻译中: {title} ({done_chunks}/{total_chunks})"
-            if errs:
-                _log(f"⚠️ {title}: {len(errs)} 个块失败")
-            else:
-                _log(f"✅ {title}: {len(trans)} 块")
-
-            cost = cfg_local.get("_cost", {})
-            pt = cost.get("prompt_tokens", 0)
-            ct = cost.get("completion_tokens", 0)
-            cost_val, _ = calc_cost(cfg_local["model"], pt, ct)
-            state["cost_dollars"] = cost_val
-            state["elapsed_sec"] = time.time() - start_time
-
-    # 错误汇总
-    if all_errors:
-        _log(f"❌ 翻译错误: {len(all_errors)} 个块")
-        for e in all_errors[:5]:
-            _log(f"   {e['chapter']}/{e['chunk_id']}: {e['error'][:80]}")
-
-    # 低 Token 审计
-    from auditor import Auditor
-    auditor = Auditor()
-    for title, chunks_list, trans in all_translations:
-        full_text = assemble_translations(chunks_list, trans, "first_lock")
-        auditor.scan_chapter(full_text, title)
-    if auditor.total_issues > 0:
-        _log(f"📋 低 Token 审计: {auditor.total_issues} 处候选问题")
-        # 只报告 P1/P2
-        p1p2 = sum(len(v) for k, v in auditor.findings.items()
-                    if auditor._family_severity(k) in ("P1", "P2"))
-        if p1p2 > 0:
-            _log(f"   ⚠️ P1/P2 严重问题: {p1p2} 处，建议审查")
-
-    # Phase 4: 组装 + 还原
-    state["current_chapter"] = "Phase 4: 组装输出..."
-    state["progress"] = 0.88
-
-    book_name = book_path.stem
+    book_name = Path(state["file_path"]).stem
     out_dir_raw = state["output_box"].value or "output"
-    out_dir = str(PROJECT_ROOT / out_dir_raw)
-    output_path = str(PROJECT_ROOT / out_dir / book_name / f"{book_name}.{state['output_format']}")
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    output_path = str(PROJECT_ROOT / out_dir_raw / book_name / f"{book_name}.{state['output_format']}")
 
-    full_translations = []
-    for title, chunks_list, trans in all_translations:
-        full_text = assemble_translations(chunks_list, trans, "first_lock")
-        full_text = restore(full_text, placeholders, verbose=False)
-        full_translations.append((title, full_text))
+    params = {
+        "book": state["file_path"],
+        "config": cfg_local,
+        "no_preread": not state["enable_preread"],
+        "no_rat": not state["enable_rat"],
+        "no_vision": not state["use_vision"],
+        "format": state["output_format"],
+        "parallel": state["parallel"],
+        "output": output_path,
+    }
 
-    _log(f"🔄 格式还原: {len(placeholders)} 占位符")
+    def _progress(frac: float, msg: str):
+        state["progress"] = frac
+        state["current_chapter"] = msg
 
-    assemble_book(full_translations, output_path, fmt=state["output_format"])
+    result = run_translation_pipeline(
+        params=params,
+        log_fn=_log,
+        progress_fn=_progress,
+        cancel_fn=lambda: state["cancel_flag"],
+    )
 
-    state["progress"] = 1.0
-    state["current_chapter"] = "✅ 完成"
-    state["elapsed_sec"] = time.time() - start_time
-    state["output_path"] = output_path
+    if result["output_path"] is None:
+        _log("⚠️ 用户取消翻译")
+        return
+
+    state["output_path"] = result["output_path"]
+    state["cost_dollars"] = result["cost_dollars"]
+    state["elapsed_sec"] = result["elapsed_sec"]
 
     # 显示译文预览
     try:
-        preview = Path(output_path).read_text(encoding="utf-8")[:5000]
+        preview = Path(result["output_path"]).read_text(encoding="utf-8")[:5000]
         state["target_area"].set_text(preview)
     except Exception:
-        state["target_area"].set_text(f"译文已保存至: {output_path}")
+        state["target_area"].set_text(f"译文已保存至: {result['output_path']}")
 
-    _log(f"✅ 翻译完成: {output_path}")
-    _log(f"⏱ 用时: {int(state['elapsed_sec']//60)}:{int(state['elapsed_sec']%60):02d}")
-
+    _log(f"✅ 翻译完成: {result['output_path']}")
+    _log(f"⏱ 用时: {int(result['elapsed_sec']//60)}:{int(result['elapsed_sec']%60):02d}")
 
 async def _download_output():
     """下载输出文件。"""
