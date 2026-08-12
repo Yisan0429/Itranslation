@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.3.3-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.4.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
 </p>
 
@@ -30,28 +30,20 @@ Itranslation 是一个基于大语言模型的桌面翻译应用，支持将整�
 
 ## 核心差异
 
-| 能力 | 业界通常做法 | Itranslation |
+| 能力 | 常见做法 | Itranslation |
 |---|---|---|
 | 分块方式 | 每 N 行硬性切割 | 句子级分词 + 可配置重叠 |
-| 术语一致性 | 依赖 LLM 跨调用记忆 | 增量追踪模型，自动检测术语漂移 |
-| 翻译质量 | 单次翻译，无验证机制 | 重叠冗余 + RAT + KG 预读 + 可配置间隔的实时审计 |
-| 译后 QA | 直接输出 | Reflection 反思工作流：LLM 自审 → 修订（翻译 → 反思 → 改进） |
-| 中断处理 | 重新开始 | GUI 暂停/恢复；CLI 与 GUI 均支持断点续传 |
-| 成本可见性 | 结算时才知道 | 每块翻译后实时显示 token 消耗和费用（$/¥） |
-
-| 质量基准测试 | 无 | 内置 BLEU/chrF 评分 + LLM-as-Judge 评估套件 |
+| 术语一致性 | 依赖 LLM 跨调用记忆 | 增量跟踪模型 + 漂移自动告警 |
+| 翻译质量 | 单次翻译，无验证 | 重叠冗余 + RAT + KG 预读 + 实时审计 |
+| 译后质检 | 直接输出 | Reflection 反思工作流（翻译 → 反思 → 修订） |
+| 中断处理 | 从头重来 | 断点续传（GUI 与 CLI） |
+| 成本可见性 | 账单出来才知道 | 逐块 token 与费用实时显示 |
 
 ---
 
 ## 安装
 
-### 前提条件
-
-- Python 3.11 及以上 — [python.org](https://www.python.org/downloads/)
-- uv 包管理器 — `pip install uv`
-- DeepSeek API Key — [platform.deepseek.com](https://platform.deepseek.com/)（免费注册）
-
-### 安装步骤
+前置条件：Python 3.11+、[uv](https://docs.astral.sh/uv/)、[DeepSeek API Key](https://platform.deepseek.com/)。
 
 ```bash
 git clone https://github.com/Yisan0429/Itranslation.git
@@ -59,125 +51,82 @@ cd Itranslation
 uv sync
 ```
 
-核心依赖约 80 MB，10 秒内可完成安装。
-
-### 可选功能
+可选扩展：
 
 ```bash
-# Marker 视觉 PDF 提取（复杂排版精度 90%+，需下载约 1.4 GB 模型）
-uv sync --extra vision
-
-# RAT 检索增强翻译（ChromaDB + sentence-transformers，约 300 MB）
-uv sync --extra rat
+uv sync --extra vision  # Marker 视觉 PDF 提取（模型约 1.4 GB）
+uv sync --extra rat     # 检索增强翻译（约 300 MB）
 ```
 
-### 启动
+启动：
 
 ```bash
-# 桌面 GUI
-uv run python desktop.py
-
-# 命令行
-uv run python translate_book.py book.pdf --genre literature --format pdf
+uv run python desktop.py                                                       # 桌面 GUI
+uv run python translate_book.py book.pdf --genre literature --format pdf     # 命令行
 ```
 
 ---
 
-## 功能
+## 功能特性
 
 ### 输入格式
 
-| 格式 | 提取引擎 | 精度 | 说明 |
-|---|---|---|---|
-| PDF | PyMuPDF（默认） | 60–70% | 适用于标准单栏排版 |
-| PDF | Marker（可选） | 90%+ | 多栏、表格等复杂排版；需下载模型 |
-| EPUB | ebooklib | ~99% | 保留章节结构 |
-| TXT / MD | 直接读取 | 100% | 无提取损耗 |
-
-### 体裁适配
-
-| 体裁 | 翻译策略 | 典型场景 |
+| 格式 | 引擎 | 说明 |
 |---|---|---|
-| 文学 | 保留修辞、韵律与情感色彩，输出优雅现代汉语 | 小说、诗歌、散文 |
-| 哲学 | 直译保真，维持逻辑结构，术语统一 | 学术哲学著作 |
-| 自然科学 | 术语精确优先，数据、公式、单位原文保留 | 教材、研究论文 |
-| 社会科学 | 直译兼顾可读性，引文格式保留 | 历史、社会学、经济学 |
-| 技术 | 代码、命令、配置文件原文保持 | 技术文档、手册 |
+| PDF | PyMuPDF（默认）/ Marker（可选） | Marker 支持多栏排版与表格 |
+| EPUB | ebooklib | 保留章节目录结构 |
+| TXT / MD | 直接读取 | 无提取开销 |
+
+### 体裁感知翻译
+
+五种预设（文学 / 哲学 / 自然科学 / 社会科学 / 技术）分别调整语气、术语处理与格式保护规则。
 
 ### 输出格式
 
-- TXT — 纯文本，体积最小
-- MD — Markdown，保留标题层级和段落结构
-- PDF — 排版输出，自动嵌入平台对应的 CJK 中文字体
-- EPUB — 标准电子书格式，含章节目录导航
+TXT、Markdown、PDF（内嵌 CJK 字体）、EPUB（章节目录导航）。
 
 ### Reflection 反思工作流
 
-启用后每个翻译块将经过额外的质量循环：
-
-1. 翻译 — LLM 初始翻译
-2. 反思 — LLM 对照原文审查译文，识别准确性、流畅性、术语和风格方面的问题
-3. 修订 — LLM 根据反思反馈重新翻译
-
-这会增加约 2 倍的 token 消耗，但显著提升翻译质量，尤其适用于文学和哲学类文本。CLI 通过 `--reflect` 启用，GUI 通过 Reflection 开关控制。
+可选的"翻译 → 反思 → 修订"循环；约 2 倍 token 消耗换取文学与哲学文本的更高质量。通过 `--reflect` 或 GUI 开关启用。
 
 ### 并行翻译
 
-章节级并行翻译，使用可配置的线程池。默认 4 个工作线程；可在 config 中设置 `parallel_workers: 0` 禁用，或通过 CLI `--parallel 0` 关闭。
+多章节线程池并发翻译（默认 4 线程；`parallel_workers: 0` 关闭）。
 
 ### 断点续传
 
-GUI 和 CLI 均在每章翻译完成后持久化进度。若翻译因网络中断、程序崩溃或用户取消而中止，重新启动同一文件时会弹窗询问是否从断点继续，并显示已完成章节列表。
+每块翻译完成后保存进度。中断后重跑自动续传：已完成块跳过、失败块自动重译。checkpoint 按「书名 slug + 章节索引」命名，不同书籍互不冲突。
+
+### 质量审计
+
+翻译完成后自动运行缺陷族扫描（10 组正则：被字句滥用、长定语、硬译句式、名词化等），按 P1/P2/P3 分级标注候选，零 API 开销；增量一致性模型在任一术语主导译法低于 80% 时告警。
+
+### RAT（检索增强翻译）
+
+已翻译段落存入 ChromaDB 向量库（all-MiniLM-L6-v2 嵌入），翻译新块时检索相似段落作为参考上下文，提升风格与术语一致性。依赖缺失时翻译继续但无检索增强，并给出显式警告。
 
 ---
 
 ## 架构
 
 ```
-输入 (PDF / EPUB / TXT / MD)
+输入（PDF / EPUB / TXT / MD）
   │
-  ├─ Phase 0: 提取与预读
-  │   └─ PyMuPDF 或 Marker → 文本清洗 → 可选知识图谱构建
-  │
-  ├─ Phase 1: 语义分块
-  │   └─ 句子级分词 → 贪心打包 → 块间重叠（3–4 句）
-  │
-  ├─ Phase 2: 并行翻译 + Reflection
-  │   └─ 逐块：术语注入 + 上下文 → LLM 调用 → 反思 → 修订 → 向量库存储
-  │
-  ├─ Phase 3: 质量审计
-  │   └─ 缺陷族扫描（10 组正则）+ 一致性模型每 N 块审计
-  │
-  └─ Phase 4: 组装输出
-      └─ 按句对齐组装（body_join 策略；旧 checkpoint 回退 first_lock）→ TXT / MD / PDF / EPUB
+  ├─ Phase 0: 提取与预读 — PyMuPDF 或 Marker → 文本清洗 → 可选知识图谱构建
+  ├─ Phase 1: 语义分块 — 句子级分词 → 贪心打包 → 块间重叠（3–4 句）
+  ├─ Phase 2: 并行翻译 + Reflection — 逐块：术语注入 + RAT 上下文 → LLM → 向量库存储
+  ├─ Phase 3: 质量审计 — 缺陷族扫描（10 组正则）+ 一致性模型审计
+  └─ Phase 4: 组装输出 — 按句对齐 body_join（旧 checkpoint 回退 first_lock）→ 输出
 ```
 
 ## CLI 参考
 
 ```bash
-# 基础用法
-uv run python translate_book.py book.pdf
-
-# 指定体裁与输出格式
+uv run python translate_book.py book.pdf                            # 基本用法
 uv run python translate_book.py book.pdf --genre philosophy --format pdf
-
-# 快速模式（跳过预读与 RAT）
-uv run python translate_book.py book.pdf --no-preread --no-rat
-
-# 并行翻译 + 自定义输出
-uv run python translate_book.py book.pdf \
-  --genre literature \
-  --format md \
-  --model deepseek-v4-flash \
-  --parallel 4 \
-  --output final/translation
-
-# 使用 GPT-5.5（liteLLM） + Reflection
-uv run python translate_book.py book.pdf \
-  --provider litellm \
-  --model openai/gpt-5.5 \
-  --reflect \
-  --format pdf
+uv run python translate_book.py book.pdf --no-preread --no-rat      # 快速模式
+uv run python translate_book.py book.pdf --parallel 4 --output out/
+uv run python translate_book.py book.pdf --provider litellm --model openai/gpt-5.5 --reflect
 ```
 
 ---
@@ -216,73 +165,44 @@ Itranslation/
 
 ---
 
-## 竞品对比
+## 同类项目对比
 
-### Top 5 开源项目（按 GitHub 星标排序）
-
-| # | 项目 | Stars | 定位 | 优势 | 局限 |
-|---|------|-------|------|------|------|
-| 1 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI 电子书翻译 | 生态成熟（5 年）；双语输出；40+ 模型 | 无 GUI；固定行数分块；无术语审计 |
-| 2 | [Translation Agent](https://github.com/andrewyng/translation-agent) | 5.8k | Agentic 翻译演示 | Reflection 工作流开创者；高度可定制；MIT 协议 | 实验性项目；无书籍专项功能；无 GUI |
-| 3 | [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | 2.5k | Calibre 插件 | 48 种输入格式；20 种输出；多引擎 | 依赖 Calibre；上手门槛较高 |
-| 4 | [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 1.7k | CLI 电子书翻译 | 多格式支持；现代化 v2 架构；SQLite 缓存 | 仅 CLI；无翻译质量审计 |
-| 5 | [TranslateBooksWithLLMs](https://github.com/hydropix/TranslateBooksWithLLMs) | 450 | 桌面应用（Web UI） | 预编译可执行文件（Win/Mac）；格式保留；Docker | 无句子级分块；无 RAT；无术语审计 |
-
-### 功能维度对比
+### 功能对比
 
 | 维度 | Itranslation | bilingual_book_maker | Calibre 插件 | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
 |:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| 桌面 GUI | ✓（NiceGUI） | — | ✓（需 Calibre） | — | — | ✓（Web） |
+| 桌面 GUI | ✓（NiceGUI） | — | ✓（经 Calibre） | — | — | ✓（Web） |
 | 断点续传 | ✓ | ✓ | ✓ | ✓ | — | ✓ |
-| 并行翻译 | ✓ | ✓（API 批量） | ✓（多书并行） | — | — | ✓ |
+| 并行翻译 | ✓ | ✓（API 批处理） | ✓（多书） | — | — | ✓ |
 | 句子级分块 | ✓ | — | — | — | — | — |
 | 重叠冗余 | ✓ | — | — | — | — | — |
-| 术语一致性 | ✓ | 部分支持 | — | — | — | — |
-| 体裁适配 | ✓（5 种预设） | 部分支持 | — | 部分支持 | — | — |
+| 术语一致性 | ✓ | 部分 | — | — | — | — |
+| 体裁适配 | ✓（5 种预设） | 部分 | — | 部分 | — | — |
 | 知识图谱预读 | ✓ | — | — | — | — | — |
-| RAT 增强翻译 | ✓（ChromaDB） | — | — | — | — | — |
+| RAT 检索增强 | ✓（ChromaDB） | — | — | — | — | — |
 | Reflection 工作流 | ✓ | — | — | — | ✓ | — |
 | 格式保护 | ✓ | — | — | — | — | — |
-| 成本追踪 | ✓（$/¥） | — | — | — | — | ✓ |
-| 多平台 liteLLM | ✓（5 平台） | ✓（40+ 模型） | 多引擎 | OpenAI 系列 | OpenAI | 多平台 |
-| 双语输出 | — | ✓ | — | — | — | — |
-| Benchmark 套件 | ✓ | — | — | — | — | ✓ |
-| 输出格式 | TXT / MD / PDF / EPUB | 双语 EPUB / TXT | 20 种 | EPUB / TXT | TXT | TXT / EPUB / SRT |
-| 成熟度 | v1.4（2026） | 5 年 | 3 年 | v2（2025） | 研究阶段（2025） | 活跃（2026） |
+| 成本追踪 | ✓ | — | — | — | — | ✓ |
+| 基准测试套件 | ✓ | — | — | — | — | ✓ |
+| 输出格式 | TXT / MD / PDF / EPUB | 双语 EPUB / TXT | 20 种格式 | EPUB / TXT | TXT | TXT / EPUB / SRT |
 
-### 差异化优势
+### 独特优势
 
-1. 最全面的开源翻译质量管线。句子级分块、重叠冗余、RAT 检索、KG 预读和实时术语审计形成完整质量闭环，所有竞品均不同时具备。Reflection 反思工作流融入前沿 Agentic 翻译研究成果，实现翻译 → 反思 → 修订循环。
-2. 内置质量基准测试。benchmark 套件提供 BLEU/chrF 自动评分和 LLM-as-Judge 四维质量评估。
-3. 成本透明可控。token 消耗和预估费用（美元/人民币双币种）实时更新。自定义模型明确标注，不显示错误定价。
-4. API 内置重试。所有 LLM API 调用均内置指数退避重试机制（可通过 config.json 配置），确保网络波动时的稳定性。
+1. 一体化质量管线：句子级分块、重叠冗余、RAT 检索、KG 预读与实时术语审计构成同类开源项目不具备的闭环。
+2. 内置质量基准：BLEU/chrF 参考译文评分 + LLM-as-Judge 四维评估（准确/流畅/术语/风格）。
+3. 成本透明：token 与费用实时显示（美元/人民币）；自定义模型显式标注。
 
 ---
 
-## 常见问题
+## FAQ
 
-翻译中途网络断了怎么办？
+**网络中断会怎样？** 每块完成后保存进度；重跑自动检测 checkpoint 并从断点续传（已完成块跳过、失败块重译）。
 
-CLI 在每块翻译完成后保存进度。中断后重新翻译同一文件，系统会自动检测 checkpoint 并询问是否从断点继续：已完成块直接跳过，失败块自动重译（失败块不会写入已完成集合）。checkpoint 按书名 slug + 章节索引命名，不同书籍之间不会冲突。
+**扫描版 PDF 能翻译吗？** 可以，使用 Marker 视觉提取引擎（模型文件首次使用时自动下载）。
 
-扫描版 PDF 能翻译吗？
-
-可以，使用 Marker 视觉提取引擎。首次使用会自动下载约 2 GB 模型文件。
-
-能否使用自己的模型服务？
-
-
-
-如何检测可选功能是否就绪？
-
-```bash
-uv run python src/env_check.py
-```
-
-该脚本会检测 Marker 和 RAT 可选功能是否完整安装并可用。
+**如何检查可选功能？** 运行 `uv run python src/env_check.py`，报告 Marker 与 RAT 是否完整安装。
 
 ---
-
 ## 致谢
 
 Itranslation 的设计和实现受以下项目的启发，这些项目在多个开发阶段中被深入研究：

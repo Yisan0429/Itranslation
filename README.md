@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.3.3-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.4.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
 </p>
 
@@ -32,25 +32,18 @@ Itranslation is a desktop application and command-line tool for translating enti
 
 | Capability | Typical Approach | Itranslation |
 |---|---|---|
-| Chunking | Fixed line count (e.g., every 10 lines) | Sentence-level tokenization with configurable overlap |
-| Terminology Consistency | Relies on LLM memory across calls | Incremental tracking model with automated drift detection |
-| Translation Quality | Single-pass, no validation | Overlap redundancy + RAT + KG pre-read + real-time audit at configurable intervals |
-| Post-Translation QA | Output as-is | Reflection workflow: LLM self-review → revision (translate → reflect → improve) |
-| Interruption Handling | Restart from beginning | Pause/Resume in GUI; checkpoint-based resume in CLI and GUI |
-| Cost Visibility | Unknown until billing | Per-chunk token consumption and cost displayed in real time ($/¥) |
-| Quality Benchmarking | None | Built-in BLEU/chrF scoring + LLM-as-Judge evaluation suite |
+| Chunking | Fixed line count | Sentence-level tokenization with configurable overlap |
+| Terminology Consistency | LLM memory across calls | Incremental tracking model with drift detection |
+| Translation Quality | Single-pass, no validation | Overlap redundancy + RAT + KG pre-read + real-time audit |
+| Post-Translation QA | Output as-is | Reflection workflow (translate → reflect → revise) |
+| Interruption Handling | Restart from beginning | Checkpoint-based resume (GUI & CLI) |
+| Cost Visibility | Unknown until billing | Real-time per-chunk token and cost display |
 
 ---
 
 ## Installation
 
-### Prerequisites
-
-- Python 3.11 or later — [python.org](https://www.python.org/downloads/)
-- uv package manager — `pip install uv`
-- DeepSeek API Key — [platform.deepseek.com](https://platform.deepseek.com/) (free registration)
-
-### Setup
+Prerequisites: Python 3.11+, [uv](https://docs.astral.sh/uv/), and a [DeepSeek API key](https://platform.deepseek.com/).
 
 ```bash
 git clone https://github.com/Yisan0429/Itranslation.git
@@ -58,26 +51,18 @@ cd Itranslation
 uv sync
 ```
 
-Core dependencies total approximately 80 MB and install in under 10 seconds.
-
-### Optional Features
+Optional extras:
 
 ```bash
-# Marker-based visual PDF extraction (90%+ accuracy for complex layouts; ~1.4 GB model download)
-uv sync --extra vision
-
-# Retrieval-Augmented Translation (ChromaDB + sentence-transformers; ~300 MB)
-uv sync --extra rat
+uv sync --extra vision  # Marker visual PDF extraction (~1.4 GB model)
+uv sync --extra rat     # Retrieval-Augmented Translation (~300 MB)
 ```
 
-### Launch
+Launch:
 
 ```bash
-# Desktop GUI
-uv run python desktop.py
-
-# Command line
-uv run python translate_book.py book.pdf --genre literature --format pdf
+uv run python desktop.py                                                       # Desktop GUI
+uv run python translate_book.py book.pdf --genre literature --format pdf     # CLI
 ```
 
 ---
@@ -86,47 +71,39 @@ uv run python translate_book.py book.pdf --genre literature --format pdf
 
 ### Input Formats
 
-| Format | Extraction Engine | Accuracy | Notes |
-|---|---|---|---|
-| PDF | PyMuPDF (default) | 60–70% | Suitable for standard single-column layouts |
-| PDF | Marker (optional) | 90%+ | Multi-column, tables, complex formatting; requires model download |
-| EPUB | ebooklib | ~99% | Preserves chapter structure |
-| TXT / MD | Direct read | 100% | No extraction overhead |
+| Format | Engine | Notes |
+|---|---|---|
+| PDF | PyMuPDF (default) / Marker (optional) | Marker adds multi-column and table support |
+| EPUB | ebooklib | Preserves chapter structure |
+| TXT / MD | Direct read | No extraction overhead |
 
 ### Genre-Aware Translation
 
-| Genre | Strategy | Use Cases |
-|---|---|---|
-| Literature | Preserve rhetoric, rhythm, and emotional tone; elegant modern Chinese | Novels, poetry, essays |
-| Philosophy | Faithful direct translation; maintain logical structure; consistent terminology | Academic philosophy, treatises |
-| Natural Science | Terminology accuracy prioritized; data, formulas, and units preserved verbatim | Textbooks, research papers |
-| Social Science | Balanced direct translation with readability; citation format preserved | History, sociology, economics |
-| Technical | Code, commands, and configuration values left unchanged | Documentation, manuals |
+Five presets (literature / philosophy / natural science / social science / technical) adapt tone, terminology handling, and format-protection rules per genre.
 
 ### Output Formats
 
-- TXT — Plain text, minimal file size
-- MD — Markdown with heading hierarchy and paragraph structure
-- PDF — Typeset PDF with embedded CJK font (auto-detected per platform)
-- EPUB — Standard e-book format with chapter navigation
+TXT, Markdown, PDF (embedded CJK font), EPUB (chapter navigation).
 
 ### Reflection Workflow
 
-When enabled, each translated chunk goes through an additional quality loop:
-
-1. Translate — Initial LLM translation
-2. Reflect — LLM reviews the translation against the source, identifying issues in accuracy, fluency, terminology, and style
-3. Revise — LLM re-translates based on the reflection feedback
-
-This adds approximately 2× token consumption but significantly improves quality, especially for literary and philosophical texts. Configurable via `--reflect` flag (CLI) or Reflection switch (GUI).
+Optional translate → reflect → revise loop; roughly 2× token consumption for higher quality on literary and philosophical texts. Enable with `--reflect` or the GUI switch.
 
 ### Parallel Translation
 
-Chapters are translated concurrently using a configurable thread pool. Default parallelism is 4 workers; disable by setting `parallel_workers: 0` in config or passing `--parallel 0` on the CLI.
+Chapters are translated concurrently with a configurable thread pool (default 4 workers; `parallel_workers: 0` disables).
 
 ### Checkpoint & Resume
 
-Both GUI and CLI persist translation progress after each chunk. If a translation is interrupted — by network failure, application crash, or user cancellation — restarting on the same file presents a resume prompt. Successfully translated chunks are skipped; failed chunks are retried automatically (failures are never written into the completed set). Checkpoint files are named by book slug plus chapter index, so different books can never collide.
+Progress is persisted after every chunk. Interrupted runs resume with completed chunks skipped and failed chunks retried automatically. Checkpoints are named by book slug plus chapter index, so different books never collide.
+
+### Quality Audit
+
+After translation, a defect-family scan (10 regex families: passive-voice overuse, long modifiers, calques, nominalization, etc.) flags candidates at P1/P2/P3 severity with zero API cost; the incremental consistency model alerts when any term's dominant translation falls below 80%.
+
+### RAT (Retrieval-Augmented Translation)
+
+Translated passages are stored in a ChromaDB vector store (all-MiniLM-L6-v2 embeddings) and retrieved as reference context for new chunks. If dependencies are missing, translation continues without retrieval — with an explicit warning.
 
 ---
 
@@ -135,48 +112,21 @@ Both GUI and CLI persist translation progress after each chunk. If a translation
 ```
 Input (PDF / EPUB / TXT / MD)
   │
-  ├─ Phase 0: Extraction & Pre-Read
-  │   └─ PyMuPDF or Marker → text cleaning → optional Knowledge Graph construction
-  │
-  ├─ Phase 1: Semantic Chunking
-  │   └─ Sentence tokenization → greedy packing → overlap (3–4 sentences)
-  │
-  ├─ Phase 2: Translation (Parallel) + Reflection
-  │   └─ Per-chunk: terminology injection + context → LLM API → Reflect → Revise → vector store
-  │
-  ├─ Phase 3: Quality Audit
-  │   └─ Defect-family scan (10 regex families) + consistency model audit every N chunks
-  │
-  └─ Phase 4: Assembly
-      └─ Sentence-aligned assembly (body_join strategy; first-lock fallback for legacy checkpoints) → TXT / MD / PDF / EPUB output
+  ├─ Phase 0: Extraction & Pre-Read — PyMuPDF or Marker → text cleaning → optional KG construction
+  ├─ Phase 1: Semantic Chunking — sentence tokenization → greedy packing → overlap (3–4 sentences)
+  ├─ Phase 2: Translation (parallel) + Reflection — per-chunk: terminology injection + RAT context → LLM → vector store
+  ├─ Phase 3: Quality Audit — defect-family scan (10 regex families) + consistency model audit
+  └─ Phase 4: Assembly — sentence-aligned body_join (first-lock fallback for legacy checkpoints) → output
 ```
 
 ## CLI Reference
 
 ```bash
-# Basic usage
-uv run python translate_book.py book.pdf
-
-# Genre + output format
+uv run python translate_book.py book.pdf                            # Basic usage
 uv run python translate_book.py book.pdf --genre philosophy --format pdf
-
-# Fast mode (skip pre-read and RAT)
-uv run python translate_book.py book.pdf --no-preread --no-rat
-
-# Parallel translation with custom output
-uv run python translate_book.py book.pdf \
-  --genre literature \
-  --format md \
-  --model deepseek-v4-flash \
-  --parallel 4 \
-  --output final/translation
-
-# Use GPT-5.5 via liteLLM with reflection
-uv run python translate_book.py book.pdf \
-  --provider litellm \
-  --model openai/gpt-5.5 \
-  --reflect \
-  --format pdf
+uv run python translate_book.py book.pdf --no-preread --no-rat      # Fast mode
+uv run python translate_book.py book.pdf --parallel 4 --output out/
+uv run python translate_book.py book.pdf --provider litellm --model openai/gpt-5.5 --reflect
 ```
 
 ---
@@ -217,16 +167,6 @@ Itranslation/
 
 ## Comparison with Related Work
 
-### Top 5 Open-Source Projects (by GitHub stars)
-
-| # | Project | Stars | Scope | Strengths | Limitations |
-|---|---------|-------|-------|-----------|-------------|
-| 1 | [bilingual_book_maker](https://github.com/yihong0618/bilingual_book_maker) | 9.3k | CLI ebook translator | Mature ecosystem (5 years); bilingual output; 40+ models via liteLLM | No GUI; fixed-line chunking; no terminology auditing |
-| 2 | [Translation Agent](https://github.com/andrewyng/translation-agent) | 5.8k | Agentic translation demo | Reflection workflow pioneer; highly customizable; MIT license | Experimental/demo; no book-specific features; no GUI |
-| 3 | [Ebook-Translator-Calibre-Plugin](https://github.com/bookfere/Ebook-Translator-Calibre-Plugin) | 2.5k | Calibre plugin | 48 input formats; 20 output formats; multiple translation engines | Requires Calibre; higher learning curve |
-| 4 | [ebook-GPT-translator](https://github.com/jesselau76/ebook-GPT-translator) | 1.7k | CLI ebook translator | Multi-format; modern v2 architecture; SQLite resume cache | CLI only; no translation quality auditing |
-| 5 | [TranslateBooksWithLLMs](https://github.com/hydropix/TranslateBooksWithLLMs) | 450 | Desktop app (Web UI) | Pre-built executables (Win/Mac); EPUB/SRT/DOCX/TXT; formatting preservation; Docker | No sentence-level chunking; no RAT; no consistency auditing |
-
 ### Feature Comparison
 
 | Dimension | Itranslation | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
@@ -242,42 +182,27 @@ Itranslation/
 | RAT-Augmented Translation | ✓ (ChromaDB) | — | — | — | — | — |
 | Reflection Workflow | ✓ | — | — | — | ✓ | — |
 | Format Protection | ✓ | — | — | — | — | — |
-| Cost Tracking | ✓ ($/¥) | — | — | — | — | ✓ |
-| Bilingual Output | — | ✓ | — | — | — | — |
+| Cost Tracking | ✓ | — | — | — | — | ✓ |
 | Benchmark Suite | ✓ | — | — | — | — | ✓ |
 | Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | TXT | TXT / EPUB / SRT |
-| Maturity | v1.4 (2026) | 5 years | 3 years | v2 (2025) | Research (2025) | Active (2026) |
 
 ### Unique Advantages
 
-1. Most comprehensive open-source translation quality pipeline. Sentence-level chunking, overlap redundancy, RAT retrieval, KG pre-read, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project. The Reflection workflow adds a translate → reflect → revise cycle adapted from state-of-the-art agentic translation research.
-2. Built-in quality benchmarks. The benchmark suite provides BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style dimensions.
-3. Cost transparency. Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
-4. API with built-in retry. All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
+1. Integrated quality pipeline: sentence-level chunking, overlap redundancy, RAT retrieval, KG pre-read, and real-time terminology auditing form a loop absent from comparable open-source projects.
+2. Built-in quality benchmarks: BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style.
+3. Cost transparency: real-time token and cost display (USD/CNY); custom models are explicitly annotated.
 
 ---
 
 ## FAQ
 
-What happens if the network drops mid-translation?
+**What happens if the network drops mid-translation?** Progress is persisted after every chunk; re-running detects the checkpoint and resumes (completed chunks skipped, failed chunks retried).
 
-The CLI persists translation progress after every chunk. Re-running on the same file detects the existing checkpoint and offers to resume — completed chunks are skipped, failed chunks are translated again.
+**Can scanned/image-based PDFs be translated?** Yes, with the Marker visual extraction engine (model files downloaded automatically on first use).
 
-Can scanned/image-based PDFs be translated?
-
-Yes, using the Marker visual extraction engine. Model files (~2 GB) are downloaded automatically on first use.
-
-
-How do I run the environment checker?
-
-```bash
-uv run python src/env_check.py
-```
-
-This reports whether Marker and RAT optional features are fully installed and ready.
+**How do I check optional features?** Run `uv run python src/env_check.py` — it reports whether Marker and RAT are fully installed.
 
 ---
-
 ## Acknowledgments
 
 Itranslation builds on ideas and inspiration from the following projects, studied across multiple development sessions:
