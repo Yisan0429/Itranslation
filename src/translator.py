@@ -119,6 +119,7 @@ def translate_chapter(
     config: dict,
     checkpoint_path: str = None,
     cost_lock: threading.Lock = None,
+    chunk_cb: Callable = None,
 ) -> tuple[list[str], list[dict]]:
     """翻译一个章节的所有块。
 
@@ -160,6 +161,8 @@ def translate_chapter(
             if chunk.id in prev:
                 translations.append(prev[chunk.id])
                 console.print(f"  [{i+1}/{len(chunks)}] ⏭️ 跳过（已翻译）")
+                if chunk_cb:
+                    chunk_cb(i + 1, len(chunks), chunk.id, "skip")
                 continue
 
         try:
@@ -228,6 +231,8 @@ def translate_chapter(
 
             tag = "🔄" if enable_reflection else "✅"
             console.print(f"  [{i+1}/{len(chunks)}] {tag} {chunk.id}")
+            if chunk_cb:
+                chunk_cb(i + 1, len(chunks), chunk.id, "ok")
 
         except Exception as e:
             error_msg = str(e)[:200]
@@ -241,6 +246,8 @@ def translate_chapter(
             # 填充占位，保持索引对齐；记录失败块（不入 completed，重跑时重译）
             translations.append(f"[翻译失败: {error_msg[:80]}]")
             failed_ids.append(chunk.id)
+            if chunk_cb:
+                chunk_cb(i + 1, len(chunks), chunk.id, "fail")
             if checkpoint_path:
                 _save_checkpoint(
                     checkpoint_path,

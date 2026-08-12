@@ -441,7 +441,8 @@ def _run_translation_pipeline():
     }
 
     def _progress(frac: float, msg: str):
-        state["progress"] = frac
+        if frac >= state["progress"]:
+            state["progress"] = frac
         state["current_chapter"] = msg
 
     result = run_translation_pipeline(

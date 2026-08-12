@@ -42,8 +42,14 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   if params.get('clear_cache',False): vs.initialize(); vs.clear()
  provider=cfg.get('provider','deepseek'); cost_lock=threading.Lock(); consistency_lock=threading.Lock()
  def llm(sp,up,tier=None): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=cfg.get('max_tokens_per_chunk',4096),provider=provider,tier=tier,llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
+ done_lock=threading.Lock(); done_count=[0]
  def one(title,chunks,idx=0):
-  cm=ConsistencyModel(); tr,er=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs,consistency_model=cm,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=checkpoint_path_for(book.stem,idx),cost_lock=cost_lock)
+  cm=ConsistencyModel()
+  def cb(i,n,cid,status):
+   with done_lock:
+    done_count[0]+=1; d=done_count[0]
+   progress(.15+.55*d/max(total,1),f'Translating: {title} {i}/{n}')
+  tr,er=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs,consistency_model=cm,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=checkpoint_path_for(book.stem,idx),cost_lock=cost_lock,chunk_cb=cb)
   with consistency_lock:
    for term,usages in cm.term_usage.items():
     target=shared.term_usage.setdefault(term,{})
