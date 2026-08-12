@@ -10,6 +10,9 @@ from translator import translate_chapter
 from consistency import ConsistencyModel,generate_consistency_report
 from kg_builder import build_knowledge_graph,kg_to_glossary
 from api_client import call_api
+from vector_store import TranslationVectorStore
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 PROJECT_ROOT=Path(__file__).parent.parent.resolve()
 def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=None)->dict:
  log=log_fn or print; progress=progress_fn or (lambda f,m:log(m)); cancel=cancel_fn or (lambda:False); started=time.time(); cfg=params['config']; book=Path(params['book']); errors=[]; cfg.setdefault('_cost',{}); cfg['_cost'].setdefault('prompt_tokens',0); cfg['_cost'].setdefault('completion_tokens',0)
@@ -25,14 +28,39 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   if cancel(): return _result(None,chapters,groups,[],errors,started,cfg)
   t='\n\n'.join(ch.get('paragraphs',[]))
   if t.strip(): groups.append((ch['title'],chunk_text(t,target_tokens=params.get('target_tokens',1500),max_tokens=cfg.get('chunk_max_tokens',3000),overlap_sentences=overlap)))
- total=sum(len(x) for _,x in groups); progress(.15,f'Phase 2: 翻译 ({total} 块)'); shared=ConsistencyModel(); results=[]; vs=None
- if not params.get('no_rat',False): vs=TranslationVectorStore(persist_dir=cfg['vector_store_dir']); vs.initialize() if params.get('clear_cache',False) else None; vs.clear() if params.get('clear_cache',False) else None
+ total=sum(len(x) for _,x in groups); chars=sum(len(c.text) for _,xs in groups for c in xs); est_tokens=int(chars*1.8); est_cost,_=calc_cost(cfg.get('model',''),est_tokens,est_tokens,cfg.get('pricing')); log(f'预检估算:\n  总字符: {chars:,}\n  总块数: {total}\n  预估 token: ~{est_tokens:,}\n  预估费用: ${est_cost:.4f}' if est_cost is not None else '预估费用: 未知'); progress(.15,f'Phase 2: 翻译 ({total} 块)'); shared=ConsistencyModel(); results=[]; vs=None
+ if not params.get('no_rat',False):
+  vs=TranslationVectorStore(persist_dir=cfg['vector_store_dir'])
+  if params.get('clear_cache',False): vs.initialize(); vs.clear()
+ provider=cfg.get('provider','deepseek'); cost_lock=threading.Lock(); consistency_lock=threading.Lock()
  def llm(sp,up,tier=None): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=cfg.get('max_tokens_per_chunk',4096),provider=provider,tier=tier,llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
- provider=cfg.get('provider','deepseek')
- for title,chunks in groups:
-  if cancel(): break
-  trans,errs=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs if not params.get('no_rat',False) else None,consistency_model=shared,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=str(PROJECT_ROOT/'cache'/f'checkpoint_{title}.json')); results.append((title,chunks,trans)); errors.extend(errs); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),title)
+ def one(title,chunks):
+  cm=ConsistencyModel(); tr,er=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs,consistency_model=cm,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=str(PROJECT_ROOT/'cache'/f'checkpoint_{title}.json'),cost_lock=cost_lock)
+  with consistency_lock:
+   for term,usages in cm.term_usage.items():
+    target=shared.term_usage.setdefault(term,{})
+    for zh,count in usages.items(): target[zh]=target.get(zh,0)+count
+   for term,locs in cm.term_locations.items(): shared.term_locations.setdefault(term,[]).extend(locs)
+  return title,chunks,tr,er
+ workers=params.get('parallel',0) or cfg.get('parallel_workers',0)
+ if workers>1 and len(groups)>1:
+  with ThreadPoolExecutor(max_workers=workers) as pool:
+   fs=[pool.submit(one,t,c) for t,c in groups]
+   for f in as_completed(fs):
+    t,c,tr,er=f.result(); results.append((t,c,tr)); errors.extend(er); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),t)
+ else:
+  for t,c in groups:
+   if cancel(): return _result(None,chapters,groups,[],errors,started,cfg,est_tokens=est_tokens,est_cost=est_cost)
+   t,c,tr,er=one(t,c); results.append((t,c,tr)); errors.extend(er); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),t)
+ if errors:
+  log(f'翻译错误 ({len(errors)} 个块):')
+  for e in errors[:10]: log(f"  {e.get('chapter','?')}/{e.get('chunk_id','?')}: {e.get('error',e)}")
+  if len(errors)>10: log(f'  ... 还有 {len(errors)-10} 个错误')
+ from auditor import Auditor
+ auditor=Auditor()
+ for t,c,tr in results: auditor.scan_chapter(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),t)
+ if auditor.total_issues>0: log(auditor.report()); log(f'低 Token 审计共 {auditor.total_issues} 处候选')
  progress(.75,'Phase 3: 质量审计'); issues=shared.audit_all(min_occurrences=3); rd=PROJECT_ROOT/'reports'/'consistency'; rd.mkdir(parents=True,exist_ok=True); log(generate_consistency_report(issues,shared.get_glossary_snapshot(),output_path=str(rd/'consistency_report.txt'))); shared.save(str(PROJECT_ROOT/'reports'/'consistency_model.json')); json.dump(shared.get_glossary_snapshot(),open(rd/'glossary_final.json','w',encoding='utf8'),ensure_ascii=False,indent=2)
- progress(.9,'Phase 4: 组装'); name=book.stem; out=params.get('output') or str(PROJECT_ROOT/'output'/name/f'{name}.txt'); Path(out).parent.mkdir(parents=True,exist_ok=True); assemble_book([(t,restore(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),ph,verbose=False)) for t,c,tr in results],out,fmt=params.get('format','txt')); progress(1,'翻译完成'); value,_=calc_cost(cfg.get('model',''),cfg['_cost']['prompt_tokens'],cfg['_cost']['completion_tokens'],cfg.get('pricing')); return _result(out,chapters,groups,issues,errors,started,cfg,value)
-def _result(out,chapters,groups,issues,errors,started,cfg,value=None):
- c=cfg.get('_cost',{}); return {'output_path':out,'num_chapters':len(chapters),'num_chunks':sum(len(x) for _,x in groups),'num_issues':len(issues),'num_errors':len(errors),'elapsed_sec':time.time()-started,'prompt_tokens':c.get('prompt_tokens',0),'completion_tokens':c.get('completion_tokens',0),'cost_dollars':value,'errors':errors}
+ progress(.9,'Phase 4: 组装'); name=book.stem; out=params.get('output') or str(PROJECT_ROOT/'output'/name/f"{name}.{params.get('format','txt')}"); Path(out).parent.mkdir(parents=True,exist_ok=True); assemble_book([(t,restore(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),ph,verbose=False)) for t,c,tr in results],out,fmt=params.get('format','txt')); progress(1,'翻译完成'); value,_=calc_cost(cfg.get('model',''),cfg['_cost']['prompt_tokens'],cfg['_cost']['completion_tokens'],cfg.get('pricing')); return _result(out,chapters,groups,issues,errors,started,cfg,value,est_tokens,est_cost)
+def _result(out,chapters,groups,issues,errors,started,cfg,value=None,est_tokens=None,est_cost=None):
+ c=cfg.get('_cost',{}); return {'output_path':out,'num_chapters':len(chapters),'num_chunks':sum(len(x) for _,x in groups),'num_issues':len(issues),'num_errors':len(errors),'elapsed_sec':time.time()-started,'prompt_tokens':c.get('prompt_tokens',0),'completion_tokens':c.get('completion_tokens',0),'cost_dollars':value,'errors':errors,'est_tokens':est_tokens,'est_cost_dollars':est_cost}
