@@ -137,7 +137,7 @@ Chapters are translated concurrently using a configurable thread pool. Default p
 
 ### Checkpoint & Resume
 
-Both GUI and CLI persist translation progress after each chapter. If a translation is interrupted — by network failure, application crash, or user cancellation — restarting on the same file presents a resume prompt with completed chapter list.
+Both GUI and CLI persist translation progress after each chunk. If a translation is interrupted — by network failure, application crash, or user cancellation — restarting on the same file presents a resume prompt. Successfully translated chunks are skipped; failed chunks are retried automatically (failures are never written into the completed set). Checkpoint files are named by book slug plus chapter index, so different books can never collide.
 
 ---
 
@@ -206,27 +206,31 @@ uv run python translate_book.py book.pdf \
 
 ```
 Itranslation/
-├── translate_book.py     CLI entry point
-├── desktop.py            NiceGUI desktop application
+├── translate_book.py     CLI entry point (thin arg-parsing layer)
+├── desktop.py            NiceGUI desktop application (UI layer only)
 ├── Itranslation-cli.spec PyInstaller build spec
 ├── src/
+│   ├── pipeline.py       Unified translation pipeline (shared by CLI and GUI)
 │   ├── extractor.py      PDF/EPUB/TXT/MD text extraction
 │   ├── kg_builder.py     Agentic pre-read and knowledge graph construction
-│   ├── chunker.py        Sentence-level semantic chunking with overlap
-│   ├── translator.py     Translation engine (RAT + terminology injection + reflection)
+│   ├── chunker.py        Sentence-level chunking with labeled context overlap
+│   ├── translator.py     Translation engine (RAT + terminology + reflection + chunk progress callback)
 │   ├── consistency.py    Incremental terminology consistency model
-│   ├── assembler.py      Overlap removal + TXT/MD/PDF/EPUB output
+│   ├── assembler.py      Sentence-aligned assembly (body_join + first_lock)
 │   ├── vector_store.py   ChromaDB vector store for RAT
 │   ├── format_protector.py  Code/formula/URL placeholder protection
 │   ├── api_client.py     Unified API client (HTTP + liteLLM)
+│   ├── auditor.py        Low-token defect-family scan engine
+│   ├── defects.py        Defect family registry (10 families)
 │   ├── benchmark.py      BLEU/chrF + LLM-as-Judge quality evaluation
 │   ├── config.py         Configuration (DEFAULT_CONFIG + config.json)
 │   ├── env_check.py      Optional feature readiness checker
 │   └── eval.py           Component evaluation suite
+├── tests/                Unit tests (chunker / assembler / checkpoint / defects / format protector)
 ├── input/                Source documents
 ├── output/               Translations (one folder per book)
 ├── reports/              Audit reports + benchmark results
-├── cache/                Checkpoint files (JSON)
+├── cache/                Checkpoint files (JSON, named by book slug + chapter index)
 └── models/               Model cache (Marker, sentence-transformers)
 ```
 
@@ -278,7 +282,7 @@ Itranslation/
 
 What happens if the network drops mid-translation?
 
-The CLI persists translation progress after every chapter. Re-running on the same file detects the existing checkpoint and offers to resume from the interruption point.
+The CLI persists translation progress after every chunk. Re-running on the same file detects the existing checkpoint and offers to resume — completed chunks are skipped, failed chunks are translated again.
 
 Can scanned/image-based PDFs be translated?
 

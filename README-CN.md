@@ -207,27 +207,31 @@ uv run python translate_book.py book.pdf \
 
 ```
 Itranslation/
-├── translate_book.py     CLI 入口
-├── desktop.py            NiceGUI 桌面应用
+├── translate_book.py     CLI 入口（薄参数解析层）
+├── desktop.py            NiceGUI 桌面应用（仅 UI 层）
 ├── Itranslation-cli.spec PyInstaller 构建配置
 ├── src/
+│   ├── pipeline.py       统一翻译管线（CLI 与 GUI 共用）
 │   ├── extractor.py      PDF/EPUB/TXT/MD 文本提取
 │   ├── kg_builder.py     Agentic 预读与知识图谱构建
-│   ├── chunker.py        句子级语义分块与重叠
-│   ├── translator.py     翻译引擎（RAT + 术语注入 + Reflection）
-│   ├── consistency.py    增量术语一致性模型与审计报告
-│   ├── assembler.py      去重叠组装 + TXT/MD/PDF/EPUB 输出
-│   ├── vector_store.py   ChromaDB 向量存储
+│   ├── chunker.py        句子级分块（上下文重叠句显式标注）
+│   ├── translator.py     翻译引擎（RAT + 术语注入 + Reflection + 块级进度回调）
+│   ├── consistency.py    增量术语一致性模型
+│   ├── assembler.py      按句对齐组装（body_join + first_lock）
+│   ├── vector_store.py   RAT 的 ChromaDB 向量库
 │   ├── format_protector.py  代码/公式/URL 占位符保护
 │   ├── api_client.py     统一 API 客户端（HTTP + liteLLM）
-│   ├── benchmark.py       BLEU/chrF + LLM-as-Judge 质量评估
-│   ├── config.py         全局配置（DEFAULT_CONFIG + config.json）
-│   ├── env_check.py      可选功能就绪检测器
+│   ├── auditor.py        低 token 缺陷族扫描引擎
+│   ├── defects.py        缺陷族注册表（10 族）
+│   ├── benchmark.py      BLEU/chrF + LLM-as-Judge 质量评估
+│   ├── config.py         配置（DEFAULT_CONFIG + config.json）
+│   ├── env_check.py      可选功能就绪检查
 │   └── eval.py           组件评估套件
-├── input/                源文件目录
-├── output/               翻译成品（每本书一个子文件夹）
-├── reports/              审计报告 + benchmark 结果
-├── cache/                断点文件（JSON）
+├── tests/                单元测试（chunker / assembler / checkpoint / defects / format protector）
+├── input/                源文档
+├── output/               译文（每本书一个目录）
+├── reports/              审计报告与基准结果
+├── cache/                checkpoint 文件（JSON，按书名 slug + 章节索引命名）
 └── models/               模型缓存（Marker、sentence-transformers）
 ```
 
@@ -280,7 +284,7 @@ Itranslation/
 
 翻译中途网络断了怎么办？
 
-CLI 在每章完成后保存进度。中断后重新翻译同一文件，系统会自动检测 checkpoint 并询问是否从断点继续。
+CLI 在每块翻译完成后保存进度。中断后重新翻译同一文件，系统会自动检测 checkpoint 并询问是否从断点继续：已完成块直接跳过，失败块自动重译（失败块不会写入已完成集合）。checkpoint 按书名 slug + 章节索引命名，不同书籍之间不会冲突。
 
 扫描版 PDF 能翻译吗？
 
