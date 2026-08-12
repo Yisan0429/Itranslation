@@ -67,7 +67,9 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   with ThreadPoolExecutor(max_workers=workers) as pool:
    fs=[pool.submit(one,t,c,i) for i,(t,c) in enumerate(groups)]
    for f in as_completed(fs):
+    if cancel(): break
     t,c,tr,er=f.result(); results.append((t,c,tr)); errors.extend(er); progress(.15+.55*sum(len(x[1]) for x in results)/max(total,1),t)
+   if cancel(): return _result(None,chapters,groups,[],errors,started,cfg,est_tokens=est_tokens,est_cost=est_cost)
  else:
   for idx,(t,c) in enumerate(groups):
    if cancel(): return _result(None,chapters,groups,[],errors,started,cfg,est_tokens=est_tokens,est_cost=est_cost)

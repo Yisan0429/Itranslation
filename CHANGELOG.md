@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.4.0 (2026-08-13)
+
+### 修复
+- GUI 翻译崩溃：`llm_translate` 签名缺 tier 参数
+- checkpoint 失败语义：失败块不入 completed_chunks，重跑自动重译；旧失败占位符检测排除
+- GUI 并行分支组装错配（恒用第一章 chunks）；跨章术语一致性统计合并；翻译异常后 UI 状态恢复
+- 重叠句错位：chunk 显式标注 overlap_sentences / body_start_sentence，prompt 区分上下文句与正文句，组装按句对齐
+- checkpoint 命名改为「书名 slug + 章节索引」，消除跨书冲突与中文文件名
+- GUI 日志区崩溃：auditor 表格经 log_fn 传递类型不符，改为文本渲染 + _log 类型防御
+- 缺陷族正则：pronoun_unclear 全域误报、被字句距离上限过窄、名词化"进行了X"漏报；白名单收紧（被字句排除词、X性 30 词、进行一个X、习语）
+- RAT 初始化失败静默降级 → 显式警告（log_fn 可见）+ GUI 预检提示；主流程仍不阻断
+- 并行翻译分支补取消检查
+
+### 重构
+- 统一翻译管线 `src/pipeline.py`（CLI/GUI 共用）；translate_book.py 薄化为参数层；desktop.py 仅 UI 层
+- 组装默认策略切换 body_join（first_lock 保留兼容旧 checkpoint）
+
+### 新增
+- 块级翻译进度可视化：chunk_cb 回调 + GUI 单调进度条 + 状态行实时刷新
+- pytest 基建与 11 项单测（chunker / assembler / checkpoint / defects / format protector）
+- 缺陷族正反例语料 109 条 + 精确率/召回率统计
+- GUI 界面文本统一英文
+
 ## v1.3.3 (2026-06-15)
 
 ### 🚀 新增

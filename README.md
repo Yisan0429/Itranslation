@@ -145,21 +145,11 @@ Input (PDF / EPUB / TXT / MD)
   │   └─ Per-chunk: terminology injection + context → LLM API → Reflect → Revise → vector store
   │
   ├─ Phase 3: Quality Audit
-  │   └─ Consistency model: audit every N chunks; alert if term consistency < 80%
+  │   └─ Defect-family scan (10 regex families) + consistency model audit every N chunks
   │
   └─ Phase 4: Assembly
-      └─ Overlap removal (first-lock strategy) → TXT / MD / PDF / EPUB output
+      └─ Sentence-aligned assembly (body_join strategy; first-lock fallback for legacy checkpoints) → TXT / MD / PDF / EPUB output
 ```
-
-### Core Design Decisions
-
-Sentence-Level Chunking. Input text is split into sentences, then greedily packed into chunks of configurable token size. Adjacent chunks overlap by 3–4 sentences. During assembly, the first occurrence of each sentence is retained and subsequent duplicates are discarded. This provides redundant translation coverage at approximately 5% token overhead.
-
-Incremental Consistency Model. Each term translation is recorded with its source location. After every 20 chunks (configurable), the model audits all tracked terms. Any term whose dominant translation falls below the 80% consistency threshold triggers an alert, identifying both the drift and the suggested canonical translation.
-
-Retrieval-Augmented Translation. Previously translated passages are stored in a ChromaDB vector store using `all-MiniLM-L6-v2` embeddings. When translating a new chunk, the system retrieves the most semantically similar prior translations and injects them as reference context into the LLM prompt.
-
----
 
 ## CLI Reference
 
@@ -256,14 +246,14 @@ Itranslation/
 | Bilingual Output | — | ✓ | — | — | — | — |
 | Benchmark Suite | ✓ | — | — | — | — | ✓ |
 | Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | TXT | TXT / EPUB / SRT |
-| Maturity | v1.3 (2026) | 5 years | 3 years | v2 (2025) | Research (2025) | Active (2026) |
+| Maturity | v1.4 (2026) | 5 years | 3 years | v2 (2025) | Research (2025) | Active (2026) |
 
 ### Unique Advantages
 
 1. Most comprehensive open-source translation quality pipeline. Sentence-level chunking, overlap redundancy, RAT retrieval, KG pre-read, and real-time terminology auditing form an integrated quality loop absent from every comparable open-source project. The Reflection workflow adds a translate → reflect → revise cycle adapted from state-of-the-art agentic translation research.
-3. Built-in quality benchmarks. The benchmark suite provides BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style dimensions.
-4. Cost transparency. Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
-5. API with built-in retry. All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
+2. Built-in quality benchmarks. The benchmark suite provides BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style dimensions.
+3. Cost transparency. Token consumption and estimated cost (in both USD and CNY) update in real time. Custom models are explicitly annotated to avoid displaying incorrect pricing.
+4. API with built-in retry. All LLM API calls include exponential-backoff retry (configurable via `config.json`), ensuring robustness against transient network failures.
 
 ---
 
