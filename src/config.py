@@ -17,7 +17,7 @@ DEFAULT_CONFIG = {
     "vector_store_dir": str(PROJECT_ROOT / "vector_store"),  # ChromaDB
 
     # === LLM 配置 ===
-    "provider": "deepseek",  # deepseek | litellm | custom
+    "provider": "custom",  # litellm | custom
     "model": "deepseek-v4-pro",
     # 安全提示: API Key 可通过环境变量 DEEPSEEK_API_KEY 设置，
     # 或写入 config.json（config.json 已被 .gitignore 排除，不会提交到 Git）。
@@ -175,8 +175,8 @@ def calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: d
 # provider:      实际调用的 provider 类型（deepseek / litellm / custom）
 MODEL_PRESETS = [
     # DeepSeek（直连）
-    {"provider_label": "DeepSeek", "provider": "deepseek", "model": "deepseek-v4-pro", "label": "V4 Pro"},
-    {"provider_label": "DeepSeek", "provider": "deepseek", "model": "deepseek-v4-flash", "label": "V4 Flash"},
+    {"provider_label": "DeepSeek", "provider": "custom", "model": "deepseek-v4-pro", "label": "V4 Pro"},
+    {"provider_label": "DeepSeek", "provider": "custom", "model": "deepseek-v4-flash", "label": "V4 Flash"},
     # OpenAI（via liteLLM）
     {"provider_label": "OpenAI", "provider": "litellm", "model": "openai/gpt-5.5", "label": "GPT-5.5"},
     {"provider_label": "OpenAI", "provider": "litellm", "model": "openai/gpt-5.5-mini", "label": "GPT-5.5 Mini"},

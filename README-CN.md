@@ -65,6 +65,63 @@ uv run python desktop.py                                                       #
 uv run python translate_book.py book.pdf --genre literature --format pdf     # 命令行
 ```
 
+## API 配置
+
+配置优先级（从高到低）：CLI 参数 > GUI 输入框 > config.json > 环境变量。
+
+### 两种提供商模式
+
+| 模式 | provider 值 | 模型格式 | API Key 来源 |
+|---|---|---|---|
+| Custom（OpenAI 兼容接口） | `custom` | 任意，如 `deepseek-v4-pro` | 环境变量 `DEEPSEEK_API_KEY`、config.json 或 GUI/CLI |
+| liteLLM（100+ 模型） | `litellm` | `openai/gpt-5.5`、`anthropic/claude-sonnet-4-6`、`gemini/gemini-3.5-pro` | 环境变量 `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY`，或显式传入 |
+
+### config.json 示例
+
+DeepSeek（默认）：
+
+```json
+{
+    "api_key": "sk-...",
+    "model": "deepseek-v4-pro",
+    "api_base": "https://api.deepseek.com/v1"
+}
+```
+
+OpenAI（经 liteLLM）：
+
+```json
+{
+    "provider": "litellm",
+    "model": "openai/gpt-5.5"
+}
+```
+
+任意 OpenAI 兼容接口：
+
+```json
+{
+    "provider": "custom",
+    "api_key": "sk-...",
+    "api_base": "https://your-endpoint.example.com/v1",
+    "model": "your-model-name"
+}
+```
+
+### 三档模型
+
+默认 `use_tiered_models` 为 `true`，管线使用三档模型（`llm_tiers.strong` 用于翻译、`cheap` 用于审计、`fast` 用于预读），默认全部指向 DeepSeek。切换提供商时，需同步修改 `llm_tiers`，或设置 `"use_tiered_models": false` 以全程使用单一 `model`。
+
+### CLI
+
+```bash
+uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4-pro     --api-key sk-xxx --api-base https://api.deepseek.com/v1
+```
+
+### GUI
+
+在左侧面板填写 Provider / 模型 / API Key / API Base，仅在当前会话生效，不持久化。
+
 ---
 
 ## 功能特性

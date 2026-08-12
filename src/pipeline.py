@@ -27,7 +27,7 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
  if not book.exists(): raise FileNotFoundError(str(book))
  progress(.02,'Phase 0: 提取 + 预读'); text=extract_book(str(book),use_vision=not params.get('no_vision',False)); log(f'提取: {len(text)} 字符'); text,ph=protect(text); chapters=parse_structure(text); log(f'章节: {len(chapters)} 章'); kg={}; glossary={}
  if not params.get('no_preread',False) and cfg.get('enable_agentic_preread',True):
-  def kg_call(sp,up): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=4096,provider=cfg.get('provider','deepseek'),tier='fast',llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
+  def kg_call(sp,up): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=4096,provider=cfg.get('provider','custom'),tier='fast',llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
   kg=build_knowledge_graph(text,kg_call,sample_ratio=cfg.get('preread_sample_ratio',.1),max_sample_tokens=cfg.get('preread_max_sample_tokens',30000)); glossary=kg_to_glossary(kg); (PROJECT_ROOT/'reports').mkdir(parents=True,exist_ok=True); json.dump(kg,open(PROJECT_ROOT/'reports'/'knowledge_graph.json','w',encoding='utf8'),ensure_ascii=False,indent=2)
  else: log('跳过 Pre-Read')
  if cfg.get('genre')=='auto': cfg['genre']=kg.get('book_metadata',{}).get('genre','natural_science')
@@ -46,7 +46,7 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
    vs=None
   else:
    log('✅ RAT 检索增强已就绪')
- provider=cfg.get('provider','deepseek'); cost_lock=threading.Lock(); consistency_lock=threading.Lock()
+ provider=cfg.get('provider','custom'); cost_lock=threading.Lock(); consistency_lock=threading.Lock()
  def llm(sp,up,tier=None): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=cfg.get('max_tokens_per_chunk',4096),provider=provider,tier=tier,llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
  done_lock=threading.Lock(); done_count=[0]
  def one(title,chunks,idx=0):

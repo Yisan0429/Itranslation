@@ -1,10 +1,9 @@
 """
 API 客户端 — 统一的 LLM API 调用封装。
 
-支持三种 Provider：
-  - deepseek: 直连 DeepSeek API（urllib，零额外依赖）
-  - litellm:  通过 liteLLM 统一接口调用 100+ 模型（OpenAI / Anthropic / Gemini / Groq / Qwen ...）
-  - custom:   任意 OpenAI 兼容 API（Ollama / vLLM / 自定义端点）
+支持两种 Provider：
+  - litellm: 通过 liteLLM 统一接口调用 100+ 模型（OpenAI / Anthropic / Gemini / Groq / Qwen ...）
+  - custom:  任意 OpenAI 兼容 API（DeepSeek / Ollama / vLLM / 自定义端点）
 
 内置重试机制（指数退避）。
 """
@@ -29,7 +28,7 @@ def call_api(
     max_retries: int = 3,
     retry_base_delay: float = 2.0,
     retry_max_delay: float = 30.0,
-    provider: str = "deepseek",
+    provider: str = "custom",
     tier: str = None,
     llm_tiers: dict = None,
     extra_body: dict = None,
@@ -47,7 +46,7 @@ def call_api(
         max_retries: 最大重试次数
         retry_base_delay: 重试基础延迟（秒）
         retry_max_delay: 重试最大延迟（秒）
-        provider: 提供商类型 — "deepseek" | "litellm" | "custom"
+        provider: 提供商类型 — "litellm" | "custom"
         tier: 可选的三档模型标识 ("strong"|"cheap"|"fast")，优先级高于 model 参数
         llm_tiers: 三档模型配置 dict，key 为 tier 名，value 含 model 和 reasoning_effort
         extra_body: 额外的请求体字段（如 {"reasoning_effort": "high"}）

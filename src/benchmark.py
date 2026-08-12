@@ -140,7 +140,7 @@ Translation (Chinese):
             user_prompt=user_prompt,
             max_tokens=512,
             temperature=0.1,
-            provider=cfg.get("provider", "deepseek"),
+            provider=cfg.get("provider", "custom"),
         )
         if not result or not result.strip():
             return {"error": "LLM returned empty response"}
@@ -178,7 +178,7 @@ def translate_sample(source: str, genre: str) -> tuple[str, dict]:
     if not api_key:
         return "", {"error": "未配置 API Key"}
 
-    provider = cfg.get("provider", "deepseek")
+    provider = cfg.get("provider", "custom")
 
     genre_styles = {
         "literature": "Literary translation. Preserve rhetoric, rhythm, emotional tone. Elegant modern Chinese.",
@@ -297,7 +297,7 @@ def run_full_benchmark(quick: bool = False):
     from rich.table import Table
     console = Console()
 
-    provider = cfg.get("provider", "deepseek")
+    provider = cfg.get("provider", "custom")
     model = cfg.get("model", "deepseek-v4-pro")
 
     console.print()

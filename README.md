@@ -65,6 +65,63 @@ uv run python desktop.py                                                       #
 uv run python translate_book.py book.pdf --genre literature --format pdf     # CLI
 ```
 
+## API Configuration
+
+Configuration precedence (highest first): CLI flags > GUI inputs > `config.json` > environment variables.
+
+### Provider modes
+
+| Mode | Provider value | Model format | Key source |
+|---|---|---|---|
+| Custom (OpenAI-compatible) | `custom` | any, e.g. `deepseek-v4-pro` | `DEEPSEEK_API_KEY` env var, `config.json`, or GUI/CLI |
+| liteLLM (100+ models) | `litellm` | `openai/gpt-5.5`, `anthropic/claude-sonnet-4-6`, `gemini/gemini-3.5-pro` | `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` env vars, or explicit key |
+
+### `config.json` examples
+
+DeepSeek (default values):
+
+```json
+{
+    "api_key": "sk-...",
+    "model": "deepseek-v4-pro",
+    "api_base": "https://api.deepseek.com/v1"
+}
+```
+
+OpenAI via liteLLM:
+
+```json
+{
+    "provider": "litellm",
+    "model": "openai/gpt-5.5"
+}
+```
+
+Any OpenAI-compatible endpoint:
+
+```json
+{
+    "provider": "custom",
+    "api_key": "sk-...",
+    "api_base": "https://your-endpoint.example.com/v1",
+    "model": "your-model-name"
+}
+```
+
+### Tiered models
+
+By default `use_tiered_models` is `true` and the pipeline uses three tiers (`llm_tiers.strong` for translation, `cheap` for audit, `fast` for pre-read), all preset to DeepSeek. When switching providers, either update `llm_tiers` accordingly or set `"use_tiered_models": false` to use a single `model` everywhere.
+
+### CLI
+
+```bash
+uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4-pro     --api-key sk-xxx --api-base https://api.deepseek.com/v1
+```
+
+### GUI
+
+Fill in Provider / Model / API Key / API Base in the left panel. Values apply to the current session and are not persisted.
+
 ---
 
 ## Features

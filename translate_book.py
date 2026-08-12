@@ -42,7 +42,7 @@ console = Console()
 
 def main():
     parser=argparse.ArgumentParser(description="book-translation — AI 全书翻译工具")
-    parser.add_argument("book"); parser.add_argument("--config",default=None); parser.add_argument("--genre",default="auto"); parser.add_argument("--provider",default="deepseek"); parser.add_argument("--model",default="deepseek-v4-pro"); parser.add_argument("--api-key",default=None); parser.add_argument("--api-base",default=None); parser.add_argument("--no-vision",action="store_true"); parser.add_argument("--no-preread",action="store_true"); parser.add_argument("--no-rat",action="store_true"); parser.add_argument("--reflect",action="store_true"); parser.add_argument("--reflect-depth",type=int,default=1); parser.add_argument("--target-tokens",type=int,default=1500); parser.add_argument("--overlap",type=int,default=None); parser.add_argument("--output",default=None); parser.add_argument("--format",default="txt"); parser.add_argument("--parallel",type=int,default=0); parser.add_argument("--clear-cache",action="store_true"); parser.add_argument("-v","--verbose",action="store_true")
+    parser.add_argument("book"); parser.add_argument("--config",default=None); parser.add_argument("--genre",default="auto"); parser.add_argument("--provider",default="custom"); parser.add_argument("--model",default="deepseek-v4-pro"); parser.add_argument("--api-key",default=None); parser.add_argument("--api-base",default=None); parser.add_argument("--no-vision",action="store_true"); parser.add_argument("--no-preread",action="store_true"); parser.add_argument("--no-rat",action="store_true"); parser.add_argument("--reflect",action="store_true"); parser.add_argument("--reflect-depth",type=int,default=1); parser.add_argument("--target-tokens",type=int,default=1500); parser.add_argument("--overlap",type=int,default=None); parser.add_argument("--output",default=None); parser.add_argument("--format",default="txt"); parser.add_argument("--parallel",type=int,default=0); parser.add_argument("--clear-cache",action="store_true"); parser.add_argument("-v","--verbose",action="store_true")
     a=parser.parse_args(); cfg=load_config(a.config); cfg.update(provider=a.provider,model=a.model); cfg["genre"]=a.genre if a.genre!="auto" else cfg.get("genre","auto")
     if a.api_key: cfg["api_key"]=a.api_key
     if a.api_base: cfg["api_base"]=a.api_base
@@ -56,7 +56,7 @@ def main():
     _print_summary(cfg, result["num_chapters"], result["num_chunks"], result["num_issues"], result["num_errors"], result["output_path"], time.time()-result["elapsed_sec"] if result["elapsed_sec"] else 0)
 
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):
-    provider = cfg.get("provider", "deepseek")
+    provider = cfg.get("provider", "custom")
     model = cfg.get("model", "?")
     reflect = "🔄" if cfg.get("enable_reflection") else "—"
 

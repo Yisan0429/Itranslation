@@ -32,7 +32,7 @@ state = {
     "file_path": None,
     "file_name": "",
     "genre": "auto",
-    "provider": "deepseek",
+    "provider": "custom",
     "model": "deepseek-v4-pro",
     "api_key": cfg.get("api_key", ""),
     "api_base": cfg.get("api_base", "https://api.deepseek.com/v1"),
