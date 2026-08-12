@@ -165,44 +165,6 @@ Itranslation/
 
 ---
 
-## Comparison with Related Work
-
-### Feature Comparison
-
-| Dimension | Itranslation | bilingual_book_maker | Calibre Plugin | ebook-GPT-translator | Translation Agent | TranslateBooksWithLLMs |
-|:---|:---:|:---:|:---:|:---:|:---:|:---:|
-| Desktop GUI | ✓ (NiceGUI) | — | ✓ (via Calibre) | — | — | ✓ (Web) |
-| Checkpoint/Resume | ✓ | ✓ | ✓ | ✓ | — | ✓ |
-| Parallel Translation | ✓ | ✓ (API batch) | ✓ (multi-book) | — | — | ✓ |
-| Sentence-Level Chunking | ✓ | — | — | — | — | — |
-| Overlap Redundancy | ✓ | — | — | — | — | — |
-| Terminology Consistency | ✓ | Partial | — | — | — | — |
-| Genre Adaptation | ✓ (5 presets) | Partial | — | Partial | — | — |
-| Knowledge Graph Pre-Read | ✓ | — | — | — | — | — |
-| RAT-Augmented Translation | ✓ (ChromaDB) | — | — | — | — | — |
-| Reflection Workflow | ✓ | — | — | — | ✓ | — |
-| Format Protection | ✓ | — | — | — | — | — |
-| Cost Tracking | ✓ | — | — | — | — | ✓ |
-| Benchmark Suite | ✓ | — | — | — | — | ✓ |
-| Output Formats | TXT / MD / PDF / EPUB | Bilingual EPUB / TXT | 20 formats | EPUB / TXT | TXT | TXT / EPUB / SRT |
-
-### Unique Advantages
-
-1. Integrated quality pipeline: sentence-level chunking, overlap redundancy, RAT retrieval, KG pre-read, and real-time terminology auditing form a loop absent from comparable open-source projects.
-2. Built-in quality benchmarks: BLEU/chrF scoring against reference translations and LLM-as-Judge evaluation across accuracy, fluency, terminology, and style.
-3. Cost transparency: real-time token and cost display (USD/CNY); custom models are explicitly annotated.
-
----
-
-## FAQ
-
-**What happens if the network drops mid-translation?** Progress is persisted after every chunk; re-running detects the checkpoint and resumes (completed chunks skipped, failed chunks retried).
-
-**Can scanned/image-based PDFs be translated?** Yes, with the Marker visual extraction engine (model files downloaded automatically on first use).
-
-**How do I check optional features?** Run `uv run python src/env_check.py` — it reports whether Marker and RAT are fully installed.
-
----
 ## Acknowledgments
 
 Itranslation builds on ideas and inspiration from the following projects, studied across multiple development sessions:
