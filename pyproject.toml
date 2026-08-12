@@ -21,3 +21,7 @@ dependencies = [
 vision = ["marker-pdf>=1.10"]
 rat = ["chromadb>=1.5", "sentence-transformers>=5.5"]
 full = ["Itranslation[vision,rat]"]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
