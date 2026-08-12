@@ -429,6 +429,15 @@ def _run_translation_pipeline():
     out_dir_raw = state["output_box"].value or "output"
     output_path = str(PROJECT_ROOT / out_dir_raw / book_name / f"{book_name}.{state['output_format']}")
 
+    if state["enable_rat"]:
+        try:
+            from env_check import check_rat
+            _rat = check_rat()
+            if not _rat.get("available"):
+                _log("⚠️ RAT unavailable: " + _rat.get("message", ""))
+                ui.notify("RAT unavailable, continuing without retrieval augmentation", type="warning")
+        except Exception:
+            pass
     params = {
         "book": state["file_path"],
         "config": cfg_local,

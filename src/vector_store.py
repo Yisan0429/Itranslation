@@ -87,6 +87,11 @@ class TranslationVectorStore:
         self._initialized = False
         self._init_attempted = False
 
+    @property
+    def ready(self) -> bool:
+        """RAT 是否成功初始化（False = 降级，检索增强不可用）。"""
+        return self._initialized
+
     def initialize(self):
         """延迟初始化 ChromaDB（避免导入时的开销）。"""
         if self._initialized:

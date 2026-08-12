@@ -40,6 +40,12 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
  if not params.get('no_rat',False):
   vs=TranslationVectorStore(persist_dir=cfg['vector_store_dir'])
   if params.get('clear_cache',False): vs.initialize(); vs.clear()
+  else: vs.initialize()
+  if not vs.ready:
+   log('⚠️ RAT 不可用（依赖缺失或嵌入模型加载失败），本次翻译不含检索增强；主流程不受影响。安装: uv sync --extra rat')
+   vs=None
+  else:
+   log('✅ RAT 检索增强已就绪')
  provider=cfg.get('provider','deepseek'); cost_lock=threading.Lock(); consistency_lock=threading.Lock()
  def llm(sp,up,tier=None): return call_api(api_key=cfg.get('api_key',''),api_base=cfg.get('api_base','https://api.deepseek.com/v1'),model=cfg.get('model','deepseek-v4-pro'),system_prompt=sp,user_prompt=up,max_tokens=cfg.get('max_tokens_per_chunk',4096),provider=provider,tier=tier,llm_tiers=cfg.get('llm_tiers') if cfg.get('use_tiered_models') else None)
  done_lock=threading.Lock(); done_count=[0]
