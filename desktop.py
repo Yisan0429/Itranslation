@@ -526,7 +526,7 @@ def _run_translation_pipeline():
             _log(f"⚠️ 预读失败: {e}")
 
     # LLM 翻译函数
-    def llm_translate(sp, up):
+    def llm_translate(sp, up, tier=None):
         return call_api(
             api_key=state["api_key"],
             api_base=state["api_base"],
@@ -534,6 +534,8 @@ def _run_translation_pipeline():
             system_prompt=sp, user_prompt=up,
             max_tokens=cfg_local.get("max_tokens_per_chunk", 4096),
             provider=state["provider"],
+            tier=tier,
+            llm_tiers=cfg_local.get("llm_tiers") if cfg_local.get("use_tiered_models") else None,
         )
 
     cost_lock = th.Lock()

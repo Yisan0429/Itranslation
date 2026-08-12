@@ -139,12 +139,20 @@ def translate_chapter(
     if checkpoint.get("content_hash") != content_hash:
         checkpoint = {}
     done_ids = set(checkpoint.get("completed_chunks", []))
+    # 旧版 checkpoint 可能把失败占位符存为已完成译文，恢复时将其排除并重译
+    stale_failed = {
+        cid for cid, text in checkpoint.get("translations", {}).items()
+        if isinstance(text, str) and text.startswith("[翻译失败:")
+    }
+    done_ids -= stale_failed
 
     enable_reflection = config.get("enable_reflection", False)
     reflection_depth = config.get("reflection_depth", 1)
 
     translations = []
     errors = []
+
+    failed_ids = []
 
     for i, chunk in enumerate(chunks):
         if chunk.id in done_ids:
@@ -206,6 +214,7 @@ def translate_chapter(
                     len(translations),
                     len(chunks),
                     content_hash,
+                    failed_ids,
                 )
 
             # 7. 每 N 块审计
@@ -229,9 +238,9 @@ def translate_chapter(
                 "error": error_msg,
                 "stage": "translate",
             })
-            # 填充占位，保持索引对齐
+            # 填充占位，保持索引对齐；记录失败块（不入 completed，重跑时重译）
             translations.append(f"[翻译失败: {error_msg[:80]}]")
-            # 仍然保存 checkpoint（跳过坏块）
+            failed_ids.append(chunk.id)
             if checkpoint_path:
                 _save_checkpoint(
                     checkpoint_path,
@@ -240,6 +249,7 @@ def translate_chapter(
                     len(translations),
                     len(chunks),
                     content_hash,
+                    failed_ids,
                 )
 
     return translations, errors
@@ -492,13 +502,18 @@ def _load_checkpoint(path: str) -> dict:
         return {}
 
 
-def _save_checkpoint(path: str, translations: dict, chapter: str, done: int, total: int, content_hash: str = ""):
+def _save_checkpoint(path: str, translations: dict, chapter: str, done: int, total: int, content_hash: str = "", failed_ids: list = None):
+    """保存 checkpoint。失败块不进入 completed_chunks/translations，重跑时会被重新翻译。"""
+    failed_ids = failed_ids or []
+    failed_set = set(failed_ids)
+    ok_translations = {k: v for k, v in translations.items() if k not in failed_set}
     data = {
         "chapter": chapter,
-        "completed": done,
+        "completed": len(ok_translations),
         "total": total,
-        "completed_chunks": list(translations.keys()),
-        "translations": translations,
+        "completed_chunks": list(ok_translations.keys()),
+        "failed_chunks": list(failed_ids),
+        "translations": ok_translations,
         "content_hash": content_hash,
         "updated_at": time.time(),
     }
