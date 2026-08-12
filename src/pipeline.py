@@ -73,7 +73,10 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
  from auditor import Auditor
  auditor=Auditor()
  for t,c,tr in results: auditor.scan_chapter(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),t)
- if auditor.total_issues>0: log(str(auditor.report())); log(f'低 Token 审计共 {auditor.total_issues} 处候选')
+ if auditor.total_issues>0:
+  import io as _io
+  from rich.console import Console as _Console
+  _buf=_io.StringIO(); _Console(file=_buf,force_terminal=True,width=100).print(auditor.report()); log(_buf.getvalue().rstrip()); log(f'低 Token 审计共 {auditor.total_issues} 处候选')
  progress(.75,'Phase 3: 质量审计'); issues=shared.audit_all(min_occurrences=3); rd=PROJECT_ROOT/'reports'/'consistency'; rd.mkdir(parents=True,exist_ok=True); log(generate_consistency_report(issues,shared.get_glossary_snapshot(),output_path=str(rd/'consistency_report.txt'))); shared.save(str(PROJECT_ROOT/'reports'/'consistency_model.json')); json.dump(shared.get_glossary_snapshot(),open(rd/'glossary_final.json','w',encoding='utf8'),ensure_ascii=False,indent=2)
  progress(.9,'Phase 4: 组装'); name=book.stem; out=params.get('output') or str(PROJECT_ROOT/'output'/name/f"{name}.{params.get('format','txt')}"); Path(out).parent.mkdir(parents=True,exist_ok=True); assemble_book([(t,restore(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),ph,verbose=False)) for t,c,tr in results],out,fmt=params.get('format','txt')); progress(1,'翻译完成'); value,_=calc_cost(cfg.get('model',''),cfg['_cost']['prompt_tokens'],cfg['_cost']['completion_tokens'],cfg.get('pricing')); return _result(out,chapters,groups,issues,errors,started,cfg,value,est_tokens,est_cost)
 def _result(out,chapters,groups,issues,errors,started,cfg,value=None,est_tokens=None,est_cost=None):
