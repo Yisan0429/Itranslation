@@ -77,44 +77,44 @@ def main_page():
 
 def _build_control_panel():
     with ui.column().classes("w-96 p-4 gap-2 bg-gray-50 border-r border-gray-200 h-full"):
-        ui.label("控制面板").classes("text-base font-bold mb-1")
+        ui.label("Control Panel").classes("text-base font-bold mb-1")
 
         # 输入 + 输出
         with ui.row().classes("w-full gap-2"):
             with ui.column().classes("flex-1"):
-                ui.label("输入").classes("text-xs text-gray-500")
-                state["file_box"] = ui.label("未选择")\
+                ui.label("Input").classes("text-xs text-gray-500")
+                state["file_box"] = ui.label("No file")\
                     .classes("w-full px-3 py-2 text-xs border rounded cursor-pointer")
                 state["file_upload"] = ui.upload(on_upload=_on_file_upload, auto_upload=True)\
                     .classes("hidden")
                 state["file_box"].on("click", lambda: state["file_upload"].run_method("pickFiles"))
             with ui.column().classes("flex-1"):
-                ui.label("输出").classes("text-xs text-gray-500")
+                ui.label("Output").classes("text-xs text-gray-500")
                 state["output_box"] = ui.input(value="output")\
                     .classes("w-full text-xs").props("dense")
 
         # 体裁 + 输出格式 + 并行
         with ui.row().classes("w-full gap-2 mt-1"):
             with ui.column().classes("flex-1"):
-                ui.label("体裁").classes("text-xs text-gray-500")
+                ui.label("Genre").classes("text-xs text-gray-500")
                 ui.select(
                     options=["auto", "literature", "philosophy", "natural_science", "social_science", "technical"],
                     value="auto",
                     on_change=lambda e: state.update(genre=e.value),
                 ).classes("w-full")
             with ui.column().classes("flex-1"):
-                ui.label("输出").classes("text-xs text-gray-500")
+                ui.label("Output").classes("text-xs text-gray-500")
                 ui.select(
                     options=["txt", "md", "pdf", "epub"],
                     value="txt",
                     on_change=lambda e: state.update(output_format=e.value),
                 ).classes("w-full")
             with ui.column().classes("flex-1"):
-                ui.label("并行").classes("text-xs text-gray-500")
+                ui.label("Parallel").classes("text-xs text-gray-500")
                 ui.select(
-                    options=["自动", "1", "2", "3", "4", "6", "8", "12", "16"],
-                    value="自动",
-                    on_change=lambda e: state.update(parallel=0 if e.value == "自动" else int(e.value)),
+                    options=["Auto", "1", "2", "3", "4", "6", "8", "12", "16"],
+                    value="Auto",
+                    on_change=lambda e: state.update(parallel=0 if e.value == "Auto" else int(e.value)),
                 ).classes("w-full")
 
         # Provider + 模型
@@ -134,7 +134,7 @@ def _build_control_panel():
                 on_change=lambda e: _on_model_select(e.value),
             ).classes("flex-1")
         state["model_input"] = ui.input(value="",
-            placeholder="输入模型名 (如 openai/gpt-5.5)",
+            placeholder="Enter model name (e.g. openai/gpt-5.5)",
             on_change=lambda e: state.update(model=e.value))
         state["model_input"].classes("w-full mt-1")
         state["model_input"].set_visibility(False)
@@ -154,7 +154,7 @@ def _build_control_panel():
         ).classes("w-full")
 
         with ui.row().classes("gap-3 mt-2"):
-            ui.switch("预读", value=False,
+            ui.switch("Pre-read", value=False,
                       on_change=lambda e: state.update(enable_preread=e.value))
             ui.switch("RAT", value=False,
                       on_change=lambda e: state.update(enable_rat=e.value))
@@ -165,11 +165,11 @@ def _build_control_panel():
 
         # 按钮 + 状态
         state["start_btn"] = ui.button(
-            "开始翻译",
+            "Start Translation",
             on_click=_start_translation,
         ).classes("w-full bg-black text-white font-bold mt-2")
         state["cancel_btn"] = ui.button(
-            "取消",
+            "Cancel",
             on_click=_cancel_translation,
         ).classes("w-full bg-red-600 text-white font-bold mt-1")
         state["cancel_btn"].set_visibility(False)
@@ -185,24 +185,24 @@ def _build_control_panel():
 
 def _build_preview_panel():
     with ui.column().classes("flex-1 p-4 gap-2 overflow-y-auto bg-white"):
-        ui.label("原文").classes("text-sm font-bold")
-        state["source_area"] = ui.label("选择文件后将显示原文预览...")\
+        ui.label("Source").classes("text-sm font-bold")
+        state["source_area"] = ui.label("Select a file to preview the source...")\
             .classes("w-full h-48 text-xs overflow-auto border p-2")\
             .style("white-space: pre-wrap; font-family: monospace")
 
         ui.separator().classes("my-1")
 
         with ui.row().classes("w-full items-center"):
-            ui.label("译文").classes("text-sm font-bold")
+            ui.label("Translation").classes("text-sm font-bold")
             ui.space()
-            state["download_btn"] = ui.button("下载", on_click=_download_output)\
+            state["download_btn"] = ui.button("Download", on_click=_download_output)\
                 .classes("bg-black text-white text-xs")
             state["download_btn"].set_visibility(False)
-        state["target_area"] = ui.label("翻译完成后将在此显示译文...")\
+        state["target_area"] = ui.label("Translation will appear here after completion.")\
             .classes("w-full h-48 text-xs overflow-auto border p-2")\
             .style("white-space: pre-wrap; font-family: monospace")
 
-        state["log_area"] = ui.textarea(value="", label="日志")\
+        state["log_area"] = ui.textarea(value="", label="Log")\
             .props("readonly outlined dense").classes("w-full text-2xs")
 
 
@@ -254,14 +254,14 @@ async def _on_file_upload(e):
     state["file_path"] = str(fpath)
     state["file_name"] = fname
     state["file_box"].set_text(fname)
-    ui.notify(f"已选择: {fname}", type="positive")
+    ui.notify(f"Selected: {fname}", type="positive")
 
     # 原文预览（异步读取，避免阻塞 UI）
     async def _load_preview():
         try:
             text = fpath.read_text(encoding="utf-8")[:3000]
         except Exception:
-            text = f"(预览不可用: {fname})"
+            text = f"(Preview unavailable: {fname})"
         state["source_area"].set_text(text)
     asyncio.create_task(_load_preview())
 
@@ -270,37 +270,37 @@ async def _on_file_upload(e):
 def _clear_file():
     state["file_path"] = None
     state["file_name"] = ""
-    state["file_box"].set_text("未选择")
-    state["source_area"].set_text("选择文件后将显示原文预览...")
+    state["file_box"].set_text("No file")
+    state["source_area"].set_text("Select a file to preview the source...")
 
 
 def _cancel_translation():
     state["cancel_flag"] = True
-    ui.notify("取消中...", type="warning")
+    ui.notify("Cancelling...", type="warning")
 
 
 async def _ask_clear_cache(book_name: str, checkpoints: list, outputs: list) -> bool | None:
-    """弹窗询问：检测到旧缓存，是否清除后重新翻译？
+    """弹窗询问：检测到旧缓存，是否Clear cache and retranslate?
     Returns: True=清除, False=保留续翻, None=取消
     """
     cp_names = [cp.stem.replace("checkpoint_", "") for cp in checkpoints]
-    msg = f"「{book_name}」已有翻译记录"
+    msg = f'"{book_name}" has existing translation records'
     if cp_names:
-        msg += f"\n断点: {', '.join(cp_names[:5])}"
+        msg += f"\nCheckpoints: {', '.join(cp_names[:5])}"
     if outputs:
-        msg += f"\n输出: {len(outputs)} 个文件"
-    msg += "\n\n清除后重新翻译？"
+        msg += f"\nOutputs: {len(outputs)} files"
+    msg += "\n\nClear cache and retranslate?"
 
     result = {"value": None}
 
     with ui.dialog() as dialog, ui.card().classes("p-4 gap-2"):
         ui.label(msg).classes("text-sm whitespace-pre-line")
         with ui.row().classes("gap-2 mt-2"):
-            ui.button("清除重译", on_click=lambda: [_set_result(result, True), dialog.close()])\
+            ui.button("Clear & Retranslate", on_click=lambda: [_set_result(result, True), dialog.close()])\
                 .classes("bg-red-600 text-white")
-            ui.button("保留续翻", on_click=lambda: [_set_result(result, False), dialog.close()])\
+            ui.button("Keep & Resume", on_click=lambda: [_set_result(result, False), dialog.close()])\
                 .classes("bg-gray-200 text-black")
-            ui.button("取消", on_click=lambda: dialog.close())\
+            ui.button("Cancel", on_click=lambda: dialog.close())\
                 .classes("bg-gray-100 text-black")
 
     await dialog
@@ -342,7 +342,7 @@ async def _start_translation():
 
     fp = state.get("file_path")
     if not fp or not Path(fp).exists():
-        ui.notify("请先选择文件", type="warning")
+        ui.notify("Please select a file first", type="warning")
         return
 
     # 检查是否有旧的 checkpoint/输出
@@ -362,7 +362,7 @@ async def _start_translation():
             out_dir = PROJECT_ROOT / "output" / book_name
             if out_dir.exists():
                 shutil.rmtree(out_dir)
-            ui.notify("已清除缓存，重新翻译", type="positive")
+            ui.notify("Cache cleared, retranslating", type="positive")
 
     state["translating"] = True
     state["cancel_flag"] = False
@@ -378,7 +378,7 @@ async def _start_translation():
     state["log_lines"] = []
     if state.get("log_area"):
         state["log_area"].value = ""
-    state["target_area"].set_text("翻译中...")
+    state["target_area"].set_text("Translating...")
     state["download_btn"].set_visibility(False)
 
     # 启动进度定时器
@@ -400,8 +400,8 @@ async def _start_translation():
 
     # 无论成功失败，恢复 UI 状态；错误通过 notify 与日志呈现
     if errors:
-        ui.notify(f"翻译失败: {errors[0]}", type="negative", timeout=0)
-        _log(f"❌ 翻译失败: {errors[0]}")
+        ui.notify(f"Translation failed: {errors[0]}", type="negative", timeout=0)
+        _log(f"❌ Translation failed: {errors[0]}")
 
     state["translating"] = False
     state["start_btn"].set_enabled(True)
@@ -452,7 +452,7 @@ def _run_translation_pipeline():
     )
 
     if result["output_path"] is None:
-        _log("⚠️ 用户取消翻译")
+        _log("⚠️ Translation cancelled by user")
         return
 
     state["output_path"] = result["output_path"]
@@ -464,17 +464,17 @@ def _run_translation_pipeline():
         preview = Path(result["output_path"]).read_text(encoding="utf-8")[:5000]
         state["target_area"].set_text(preview)
     except Exception:
-        state["target_area"].set_text(f"译文已保存至: {result['output_path']}")
+        state["target_area"].set_text(f"Translation saved to: {result['output_path']}")
 
-    _log(f"✅ 翻译完成: {result['output_path']}")
-    _log(f"⏱ 用时: {int(result['elapsed_sec']//60)}:{int(result['elapsed_sec']%60):02d}")
+    _log(f"✅ Translation complete: {result['output_path']}")
+    _log(f"⏱ Elapsed: {int(result['elapsed_sec']//60)}:{int(result['elapsed_sec']%60):02d}")
 
 async def _download_output():
     """下载输出文件。"""
     if state.get("output_path") and Path(state["output_path"]).exists():
         ui.download(state["output_path"])
     else:
-        ui.notify("没有可下载的文件", type="warning")
+        ui.notify("No file to download", type="warning")
 
 
 # ═══════════════════════════════════════════════════════
