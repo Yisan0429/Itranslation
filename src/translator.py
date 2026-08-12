@@ -101,9 +101,9 @@ Return ONLY the translated text — no preambles, no notes, no markdown wrapping
 {rat_section}"""
 
 
-TRANSLATION_USER_PROMPT = """{sentence_instruction}
+TRANSLATION_USER_PROMPT = """{sentence_instruction}{context_section}
 
-## Source Text
+## Source Text (translate ONLY the sentences below)
 
 {source_text}"""
 
@@ -275,7 +275,10 @@ def _translate_with_reflection(
 
     for round_num in range(depth):
         # Step 2: Reflection — LLM 审查翻译质量
-        reflect_user = _build_reflection_prompt(chunk.text, current, genre)
+        reflect_user = _build_reflection_prompt(
+            chunk.body_text() if hasattr(chunk, "body_text") else chunk.text,
+            current, genre,
+        )
         try:
             reflection, usage_r = llm_call(REFLECTION_SYSTEM_PROMPT, reflect_user, tier="cheap")
         except Exception as e:
@@ -296,7 +299,12 @@ def _translate_with_reflection(
 
         # Step 3: Revision — 根据反馈修订
         revision_system = REVISION_SYSTEM_PROMPT.format(reflection_feedback=reflection)
-        revision_user = f"Source text:\n{chunk.text}\n\nInitial translation:\n{current}\n\nPlease revise."
+        body_src = chunk.body_text() if hasattr(chunk, "body_text") else chunk.text
+        revision_user = (
+            "Source text:\n" + body_src + "\n\n"
+            + "Initial translation:\n" + current + "\n\n"
+            + "Please revise."
+        )
         try:
             revised, usage_v = llm_call(revision_system, revision_user, tier="strong")
         except Exception as e:
@@ -446,9 +454,31 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
         rat_section=rat_section,
     )
 
+    # 重叠上下文句仅供理解，不翻译；只翻译正文句
+    context_text = chunk.context_text() if hasattr(chunk, "context_text") else ""
+    source_text = chunk.body_text() if hasattr(chunk, "body_text") else chunk.text
+
+    context_section = ""
+    if context_text.strip():
+        context_section = (
+            "\n\n## Context - previous sentences for understanding only, "
+            "DO NOT translate them\n\n"
+            + context_text
+        )
+
+    body_count = getattr(chunk, "body_sentence_count", None)
+    count_line = ""
+    if body_count is not None:
+        count_line = (
+            "\nThe 'Source Text' section contains exactly " + str(body_count)
+            + " sentences. Output exactly " + str(body_count)
+            + " translated sentences."
+        )
+
     user = TRANSLATION_USER_PROMPT.format(
-        sentence_instruction=SENTENCE_INSTRUCTION,
-        source_text=chunk.text,
+        sentence_instruction=SENTENCE_INSTRUCTION + count_line,
+        context_section=context_section,
+        source_text=source_text,
     )
 
     return system, user

@@ -85,7 +85,7 @@ DEFAULT_CONFIG = {
     # === QA ===
     "enable_back_translation": False,
     "enable_llm_judge": False,
-    "assembly_strategy": "first_lock",  # first_lock | llm_judge
+    "assembly_strategy": "body_join",  # body_join | first_lock
 
     # === Reflection 反思工作流 ===
     # 启用后每个 chunk 翻译 → LLM 自审 → 修订。显著提升质量，约 2x token 消耗。

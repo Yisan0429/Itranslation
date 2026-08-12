@@ -18,6 +18,33 @@ class Chunk:
     start_sentence: int
     end_sentence: int
     token_count: int = 0
+    body_start_sentence: int | None = None
+    overlap_sentences: int = 0
+    sentences: list[str] = field(default_factory=list)
+
+    @property
+    def body_start(self) -> int:
+        """正文第一句在章内句序列中的索引（兼容旧构造：未传时回退 start_sentence）。"""
+        return self.start_sentence if self.body_start_sentence is None else self.body_start_sentence
+
+    @property
+    def body_sentence_count(self) -> int:
+        """本块正文（需翻译输出）的句数。"""
+        return self.end_sentence - self.body_start + 1
+
+    def context_text(self) -> str:
+        """chunk.text 中仅供上下文理解的重叠句文本（前 N 句）。"""
+        n = self.overlap_sentences
+        if n > 0 and self.sentences:
+            return " ".join(self.sentences[:n])
+        return ""
+
+    def body_text(self) -> str:
+        """chunk.text 中的正文文本（去掉重叠上下文句）。"""
+        n = self.overlap_sentences
+        if n > 0 and self.sentences:
+            return " ".join(self.sentences[n:])
+        return self.text
 
 
 def chunk_text(
@@ -225,6 +252,9 @@ def _add_overlap(
                 start_sentence=indices[0],
                 end_sentence=indices[-1],
                 token_count=tokens,
+                body_start_sentence=indices[0],
+                overlap_sentences=0,
+                sentences=[sent_tokens[i][0] for i in indices],
             ))
         return result
 
@@ -233,11 +263,13 @@ def _add_overlap(
     for chunk_id, indices in enumerate(raw_chunks):
         # 扩展索引：向前取 overlap 句
         extended = list(indices)
+        overlap_count = 0
         if chunk_id > 0:
             prev_indices = raw_chunks[chunk_id - 1]
             overlap_indices = prev_indices[-overlap:] if len(prev_indices) >= overlap else prev_indices[:]
-            # 前置重叠句
+            # 前置重叠句（仅供上下文理解，不参与正文翻译输出）
             extended = overlap_indices + indices
+            overlap_count = len(overlap_indices)
 
         text = " ".join(sent_tokens[i][0] for i in extended)
         tokens = sum(sent_tokens[i][1] for i in extended)
@@ -248,6 +280,9 @@ def _add_overlap(
             start_sentence=indices[0],
             end_sentence=indices[-1],
             token_count=tokens,
+            body_start_sentence=indices[0],
+            overlap_sentences=overlap_count,
+            sentences=[sent_tokens[i][0] for i in extended],
         ))
 
     return result

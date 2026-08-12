@@ -17,14 +17,19 @@ SENTENCE_SEPARATOR = "␟"
 SENTENCE_INSTRUCTION = (
     f"Output each translated sentence on its own line, "
     f"separated by the character '{SENTENCE_SEPARATOR}'. "
-    f"Do not merge sentences. Preserve sentence count exactly."
+    f"Do not merge or split sentences. "
+    f"Translate ONLY the sentences in the 'Source Text' section. "
+    f"The 'Context' section (if present) is provided for understanding only - "
+    f"it must NOT be translated and its sentences must NOT appear in the output. "
+    f"The number of output sentences must exactly equal the number of sentences "
+    f"in the 'Source Text' section."
 )
 
 
 def assemble_translations(
     chunks: list,
     translations: list[str],
-    strategy: str = "first_lock",
+    strategy: str = "body_join",
 ) -> str:
     """
     将分块译文组装为完整译文，处理重叠句。
@@ -32,7 +37,8 @@ def assemble_translations(
     Args:
         chunks: Chunk 对象列表
         translations: 对应的译文列表（与 chunks 同序，每个译文用 ␟ 分隔句子）
-        strategy: "first_lock" — 第一次出现就锁定
+        strategy: "body_join" — 按每块正文句译文直接拼接（默认推荐，句序与原文一一对应）
+                  "first_lock" — 兼容策略：每句第一次出现时定稿（旧 checkpoint 续翻）
 
     Returns:
         完整译文文本
@@ -43,39 +49,93 @@ def assemble_translations(
     assert len(chunks) == len(translations), \
         f"chunks ({len(chunks)}) and translations ({len(translations)}) must match"
 
-    return _assemble_first_lock(chunks, translations)
+    if strategy == "first_lock":
+        return _assemble_first_lock(chunks, translations)
+    elif strategy == "body_join":
+        return _assemble_body_join(chunks, translations)
+    else:
+        console.print(f"  [yellow]⚠️ 未知组装策略 '{strategy}'，回退 body_join[/yellow]")
+        return _assemble_body_join(chunks, translations)
 
 
 def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
     """
-    策略 C: 每句话在第一次出现时定稿，后续忽略。
+    兼容策略（旧 checkpoint 续翻）：每句话在第一次出现时定稿，后续忽略。
 
-    算法：
+    对齐规则（修复重叠句错位）：
     1. 每个 chunk 的译文按 ␟ 切分为句子列表
-    2. 句子索引 = chunk.start_sentence + offset
-    3. 只有在 first_seen 中不存在的句子才加入
+    2. 正文首句 = body_start_sentence（旧式 Chunk 无该字段时回退 start_sentence）
+    3. 若译文句数 > 正文句数 → 前 (N - body_count) 句是重叠上下文句的译文
+       （旧 prompt 会连上下文一起翻译），丢弃后再按 body_start + offset 对齐
+    4. 新 prompt 产物译文句数 == 正文句数，直接对齐
     """
     first_seen = {}   # sentence_index → translated line
-    chunk_sent_map = []  # [(chunk, [translated_sentences]), ...]
 
     for chunk, trans in zip(chunks, translations):
         # 按 ␟ 切分译文
-        sentences = _split_by_separator(trans, expected_count=chunk.end_sentence - chunk.start_sentence + 1)
-        chunk_sent_map.append((chunk, sentences))
-
-    # 按 chunk 顺序处理（保证"第一次出现"的语义）
-    for chunk, sentences in chunk_sent_map:
+        sentences = _split_by_separator(trans)
+        body_start, body_count = _chunk_body_range(chunk)
+        if len(sentences) > body_count:
+            # 旧式产物：开头是重叠上下文句的译文
+            skip = len(sentences) - body_count
+            sentences = sentences[skip:]
+            console.print(
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 译文含 {skip} 句重叠上下文"
+                f"（旧 prompt 产物），已跳过[/yellow]"
+            )
+        elif len(sentences) < body_count:
+            console.print(
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 期望 {body_count} 句, 实际 {len(sentences)}"
+                f" — LLM 可能合并/遗漏了句子[/yellow]"
+            )
+        # 按 chunk 顺序处理（保证"第一次出现"的语义）
         for offset, zh_sentence in enumerate(sentences):
-            sent_idx = chunk.start_sentence + offset
+            sent_idx = body_start + offset
             if sent_idx not in first_seen:
                 first_seen[sent_idx] = zh_sentence
 
     # 按句子索引排序输出
-    result = []
-    for idx in sorted(first_seen.keys()):
-        result.append(first_seen[idx])
+    result = [first_seen[idx] for idx in sorted(first_seen.keys())]
 
     return "\n".join(result)
+
+
+def _assemble_body_join(chunks: list, translations: list[str]) -> str:
+    """
+    新策略（默认推荐）：按每块正文句译文直接拼接，块间去掉重叠上下文句。
+
+    保证全书译文句序与原文句序一一对应（body_start + offset 对齐）。
+    旧式译文（含上下文句译文）同样通过句数差检测并跳过，兼容旧 checkpoint。
+    """
+    out = []
+    for chunk, trans in zip(chunks, translations):
+        sentences = _split_by_separator(trans)
+        body_start, body_count = _chunk_body_range(chunk)
+        if len(sentences) > body_count:
+            # 旧式产物：开头是重叠上下文句的译文
+            skip = len(sentences) - body_count
+            sentences = sentences[skip:]
+            console.print(
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 译文含 {skip} 句重叠上下文"
+                f"（旧 prompt 产物），已跳过[/yellow]"
+            )
+        elif len(sentences) < body_count:
+            console.print(
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 期望 {body_count} 句, 实际 {len(sentences)}"
+                f" — 句序可能错位[/yellow]"
+            )
+        out.extend(sentences)
+
+    return "\n".join(out)
+
+
+def _chunk_body_range(chunk) -> tuple:
+    """返回 (正文首句索引, 正文句数)。兼容无新字段的旧式 Chunk（鸭子类型）。"""
+    body_start = getattr(chunk, "body_start_sentence", None)
+    if body_start is None:
+        body_start = getattr(chunk, "body_start", getattr(chunk, "start_sentence", 0))
+    end = getattr(chunk, "end_sentence", body_start)
+    return body_start, end - body_start + 1
 
 
 def _split_by_separator(text: str, expected_count: int = None) -> list[str]:
