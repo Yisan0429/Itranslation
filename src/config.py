@@ -59,8 +59,8 @@ DEFAULT_CONFIG = {
     "genre": "auto",  # auto | literature | philosophy | natural_science | social_science | technical
 
     # === 分块 ===
-    "chunk_target_tokens": 3000,
-    "chunk_max_tokens": 6000,
+    "chunk_target_tokens": 1500,
+    "chunk_max_tokens": 3000,
     "overlap_by_genre": {
         "literature": 4,
         "philosophy": 3,
