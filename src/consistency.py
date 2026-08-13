@@ -146,13 +146,7 @@ def generate_consistency_report(
 ) -> str:
     """生成一致性审计报告。"""
     lines = [
-        "=" * 60,
-        "Terminology Translation Consistency Audit Report",
-        "=" * 60,
-        "",
-        f"scanned {len(glossary)} terms",
-        f"found {len(issues)} consistency drift issues (threshold <{threshold:.0%})",
-        "",
+        f"consistency audit: scanned {len(glossary)} terms, {len(issues)} drift issues (threshold <{threshold:.0%})",
     ]
 
     if issues:
@@ -172,6 +166,5 @@ def generate_consistency_report(
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(report)
-        console.print(f"[green]📋 Consistency report saved to {output_path}[/green]")
-
+        
     return report

@@ -39,11 +39,12 @@ state = {
     "api_base": cfg.get("api_base", "https://api.deepseek.com/v1"),
     "output_format": "txt",
     "output_dir": str(PROJECT_ROOT / "output"),
-    "parallel": 0,
     "enable_preread": False,
     "enable_rat": False,
     "use_vision": False,
     "enable_reflection": False,
+    "reasoning_effort": "high",
+    "custom_prompt": "",
     "translating": False,
     "cancel_flag": False,
     "log_lines": [],
@@ -62,6 +63,7 @@ state = {
 @ui.page("/api/output_dir")
 @ui.page("/")
 def main_page():
+    ui.add_css(".progress-plain .absolute-center { display: none !important; }")
     with ui.header(elevated=True).classes("bg-gray-100 text-black"):
         ui.label("Itranslation").classes("text-lg font-bold")
         ui.space()
@@ -96,6 +98,11 @@ def _build_control_panel():
         # 体裁 + 输出格式 + 并行
         with ui.row().classes("w-full gap-2 mt-1"):
             with ui.column().classes("flex-1"):
+                ui.label("Reasoning").classes("text-xs text-gray-500")
+                ui.select({"Low": "low", "High": "high", "Max": "max", "Off": "off"},
+                          value="Off",
+                          on_change=lambda e: state.update(reasoning_effort=e.value.lower())).classes("w-full")
+            with ui.column().classes("flex-1"):
                 ui.label("Genre").classes("text-xs text-gray-500")
                 ui.select(
                     options=["auto", "literature", "philosophy", "natural_science", "social_science", "technical"],
@@ -109,14 +116,6 @@ def _build_control_panel():
                     value="txt",
                     on_change=lambda e: state.update(output_format=e.value),
                 ).classes("w-full")
-            with ui.column().classes("flex-1"):
-                ui.label("Parallel").classes("text-xs text-gray-500")
-                ui.select(
-                    options=["Auto", "1", "2", "3", "4", "6", "8", "12", "16"],
-                    value="Auto",
-                    on_change=lambda e: state.update(parallel=0 if e.value == "Auto" else int(e.value)),
-                ).classes("w-full")
-
         # Model 名称（带 "前缀/名" 时自动走 liteLLM，裸名走 OpenAI 兼容直连）
         ui.label("Model").classes("text-xs text-gray-500 mt-1")
         state["model_input"] = ui.input(
@@ -150,6 +149,13 @@ def _build_control_panel():
                       on_change=lambda e: state.update(use_vision=e.value))
             ui.switch("Reflection", value=False,
                       on_change=lambda e: state.update(enable_reflection=e.value))
+            ui.switch("Custom Prompt", value=False,
+                      on_change=lambda e: state.update(custom_prompt_on=e.value,
+                                                      custom_prompt_box=state["custom_prompt_box"].set_visibility(e.value)))
+        state["custom_prompt_box"] = ui.textarea(label="Custom Prompt (replaces default translation instructions)",
+                                                placeholder="Paste your own translation rules...",
+                                                on_change=lambda e: state.update(custom_prompt=e.value))            .props("outlined dense autogrow").classes("w-full")
+        state["custom_prompt_box"].set_visibility(False)
 
         # 按钮 + 状态
         state["start_btn"] = ui.button(
@@ -165,10 +171,6 @@ def _build_control_panel():
         with ui.row().classes("w-full justify-between mt-1"):
             state["time_label"] = ui.label("--").classes("text-xs text-gray-500 font-mono")
 
-        with ui.row().classes("w-full items-center gap-2 mt-1"):
-            state["progress_bar"] = ui.linear_progress(value=0).props("size=8px").classes("flex-1")
-            state["percent_label"] = ui.label("0%").classes("text-xs font-mono text-gray-600 w-10 text-right")
-        state["chapter_label"] = ui.label("").classes("text-2xs text-gray-400")
 
 
 
@@ -180,6 +182,10 @@ def _build_preview_panel():
             .style("white-space: pre-wrap; font-family: monospace")
 
         ui.separator().classes("my-1")
+
+        with ui.row().classes("w-full items-center gap-2"):
+            state["progress_bar"] = ui.linear_progress(value=0).props("size=8px").classes("flex-1 progress-plain")
+            state["percent_label"] = ui.label("0%").classes("text-xs font-mono text-gray-600 w-10 text-right")
 
         with ui.row().classes("w-full items-center"):
             ui.label("Translation").classes("text-sm font-bold")
@@ -281,6 +287,8 @@ def _save_api_config():
     existing["model"] = _m
     existing["api_key"] = state["api_key"]
     existing["api_base"] = state["api_base"]
+    existing["reasoning_effort"] = state["reasoning_effort"]
+    existing["custom_prompt"] = state["custom_prompt"]
     io.open(cfg_path, "w", encoding="utf-8").write(
         json.dumps(existing, ensure_ascii=False, indent=2))
     ui.notify("API configuration saved to config.json", type="positive")
@@ -301,8 +309,7 @@ def _update_progress_ui():
         state["progress_bar"].value = state["progress"]
     if state.get("percent_label"):
         state["percent_label"].set_text(f"{int(state['progress'] * 100)}%")
-    if state.get("chapter_label"):
-        state["chapter_label"].set_text(state["current_chapter"])
+
     if state.get("time_label"):
         if state["elapsed_sec"] > 0:
             m, s = divmod(int(state["elapsed_sec"]), 60)
@@ -343,6 +350,9 @@ async def _start_translation():
     state["translating"] = True
     state["cancel_flag"] = False
     state["progress"] = 0.0
+    if state.get("progress_bar"):
+        state["progress_bar"].props(remove="indeterminate")
+        state["progress_bar"].value = 0.0
     state["elapsed_sec"] = 0
     state["log_lines"] = []
     state["output_path"] = None
@@ -379,6 +389,9 @@ async def _start_translation():
         _log(f"❌ Translation failed: {errors[0]}")
 
     state["translating"] = False
+    if state.get("progress_bar"):
+        state["progress_bar"].value = 1.0 if not errors else 0.0
+    state["progress"] = 1.0 if not errors else 0.0
     state["start_btn"].set_enabled(True)
     state["start_btn"].set_visibility(True)
     state["cancel_btn"].set_visibility(False)
@@ -399,9 +412,10 @@ def _run_translation_pipeline():
     cfg_local["provider"] = "litellm" if "/" in _model and not _model.startswith(("http", "https")) else "custom"
     cfg_local["model"] = _model or cfg_local.get("model", "deepseek-v4-pro")
     cfg_local["genre"] = state["genre"]
-    cfg_local["parallel_workers"] = state["parallel"]
     cfg_local["enable_agentic_preread"] = state["enable_preread"]
     cfg_local["enable_reflection"] = state["enable_reflection"]
+    cfg_local["reasoning_effort"] = state["reasoning_effort"]
+    cfg_local["custom_prompt"] = state["custom_prompt"]
 
     book_name = Path(state["file_path"]).stem
     out_dir_raw = state["output_box"].value or "output"
@@ -423,7 +437,6 @@ def _run_translation_pipeline():
         "no_rat": not state["enable_rat"],
         "no_vision": not state["use_vision"],
         "format": state["output_format"],
-        "parallel": state["parallel"],
         "output": output_path,
     }
 
@@ -431,6 +444,12 @@ def _run_translation_pipeline():
         if frac >= state["progress"]:
             state["progress"] = frac
         state["current_chapter"] = msg
+        if state.get("progress_bar"):
+            bar = state["progress_bar"]
+            if frac >= 1.0:
+                bar.value = 1.0
+            else:
+                bar.value = state["progress"]
 
     result = run_translation_pipeline(
         params=params,

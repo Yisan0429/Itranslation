@@ -34,12 +34,12 @@ def check_marker() -> dict:
 
     pkg_ok = _pkg_installed("marker")
     if not pkg_ok:
-        result["message"] = "marker-pdf 未安装"
+        result["message"] = "marker-pdf not installed"
         result["detail"] = (
-            "视觉 PDF 提取需要 marker-pdf 包（约 2GB）。\n\n"
-            "安装方法:\n"
+            "Vision PDF extraction requires the marker-pdf package (~2GB).\n\n"
+            "Install:\n"
             "  uv sync --extra vision\n\n"
-            "安装后首次使用会自动下载模型文件。"
+            "Model files are downloaded automatically on first use."
         )
         return result
 
@@ -107,7 +107,7 @@ def check_rat() -> dict:
         result["message"] = f"RAT 依赖未安装 ({', '.join(missing_pkgs)})"
         result["detail"] = (
             "RAT（检索增强翻译）可提升术语一致性，需要额外依赖。\n\n"
-            "安装方法:\n"
+            "Install:\n"
             "  uv sync --extra rat\n\n"
             "这会安装 chromadb + sentence-transformers（约 300MB）。\n"
             "安装后首次使用会自动下载嵌入模型 all-MiniLM-L6-v2 (80MB)。"

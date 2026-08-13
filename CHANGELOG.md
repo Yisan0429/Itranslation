@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.4.2 (2026-08-13)
+
+### 修复
+- config 路径键运行时解析：修复 WSL 下 UNC 绝对路径与 POSIX 拼接产生的 checkpoint Errno 2；路径键空值回退环境默认
+- Reasoning 下拉 value 映射（NiceGUI select dict 模式）、parallel 参数残留 KeyError
+
+### 新增
+- GUI Reasoning 下拉：Low / High / Max / Off（Off 注入 thinking disabled；官方档位，medium/xhigh 不再提供）
+- GUI Custom Prompt 开关 + 输入框：填入后完全替换默认翻译系统提示，Save 写入 config
+- 并行默认自动（min(章节数, 4)），Parallel 选项从 UI 移除
+- 进度条按字数 x 经验速度块内平滑推进（7%-95% 区间，实测速度 EMA 更新）；进度条移至输入与输出预览之间，关闭组件默认中间数字
+- 预检 token 估算删除：完成后显示真实用量（tokens used: N in / N out）
+- config.example.json 扩展为完整 37 键模板
+
+### 优化
+- 日志输出整理：header 改两行英文、全去 emoji、审计报告表格改行式、删除 6 处冗余行、marker-pdf 警告仅 PDF 输入触发、CLI 头部不再内嵌版本号
+- 默认章节名 Body；输出文件无标题章节不再写 "## Body" 与开头空行
+
+
 ## v1.4.0 (2026-08-13)
 
 ### 修复

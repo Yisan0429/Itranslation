@@ -196,7 +196,6 @@ def assemble_book(
     else:
         _write_txt(chapter_translations, str(path), bilingual)
 
-    console.print(f"[green]✅ Final translation saved to {path}[/green]")
 
 
 def _write_txt(chapters, path, bilingual):

@@ -43,3 +43,5 @@ build/
 !Itranslation-cli.spec
 dist/
 Itranslation-*.zip
+
+SOLUTION-V2.md

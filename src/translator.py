@@ -126,7 +126,7 @@ def translate_chapter(
     Returns:
         (translations, errors) — errors 列表每项含 {chunk_id, error, stage}
     """
-    console.print(f"\n[bold]📖 Translating chapter: {chapter_title} ({len(chunks)} chunks)[/bold]")
+    console.print(f"[bold]Translating chapter: {chapter_title} ({len(chunks)} chunks)[/bold]")
 
     if vector_store is not None:
         vector_store.initialize()
@@ -165,6 +165,8 @@ def translate_chapter(
                 continue
 
         try:
+            if chunk_cb:
+                chunk_cb(i + 1, len(chunks), chunk.id, "start")
             # 1. RAT 检索
             rat_context = _build_rat_context(chunk, vector_store, glossary, kg, config)
 
@@ -457,13 +459,17 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
             )
         rat_section = "Previously translated similar passages — maintain consistent style and terminology:\n\n" + "\n\n".join(parts)
 
-    system = TRANSLATION_SYSTEM_PROMPT.format(
-        lang_pair=f"{config.get('source_lang','en')}→{config.get('target_lang','zh')}",
-        genre=genre,
-        style_instruction=style,
-        glossary_section=glossary_section,
-        rat_section=rat_section,
-    )
+    custom = (config.get("custom_prompt") or "").strip()
+    if custom:
+        system = custom
+    else:
+        system = TRANSLATION_SYSTEM_PROMPT.format(
+            lang_pair=f"{config.get('source_lang','en')}→{config.get('target_lang','zh')}",
+            genre=genre,
+            style_instruction=style,
+            glossary_section=glossary_section,
+            rat_section=rat_section,
+        )
 
     # 重叠上下文句仅供理解，不翻译；只翻译正文句
     context_text = chunk.context_text() if hasattr(chunk, "context_text") else ""

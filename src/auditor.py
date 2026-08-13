@@ -126,30 +126,19 @@ Match: {c['match']}"""
 
         return results
 
-    def report(self) -> Table:
-        """生成审计报告。"""
+    def report(self) -> str:
+        """生成审计报告（行式文本）。"""
         if not self.findings:
             return None
 
-        table = Table(title="📋 Low-Token Audit Report")
-        table.add_column("Issue family", style="cyan")
-        table.add_column("Severity", style="yellow")
-        table.add_column("Hits", justify="right")
-        table.add_column("Status")
-
+        lines = [f"Low-token audit: {self.total_issues} candidates"]
         for family in DEFECT_FAMILIES:
             fid = family["id"]
             count = len(self.findings.get(fid, []))
             if count > 0:
-                sev_color = {"P1": "red", "P2": "yellow", "P3": "dim"}.get(family["severity"], "white")
-                table.add_row(
-                    family["name"],
-                    f"[{sev_color}]{family['severity']}[/{sev_color}]",
-                    str(count),
-                    "⚠️ needs review" if family["severity"] in ("P1", "P2") else "📝 review suggested",
-                )
-
-        return table
+                status = "needs review" if family["severity"] in ("P1", "P2") else "review suggested"
+                lines.append(f"  [{family['severity']}] {family['name']} x{count} - {status}")
+        return "\n".join(lines)
 
     def clear(self):
         self.findings.clear()

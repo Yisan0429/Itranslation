@@ -38,6 +38,8 @@ DEFAULT_CONFIG = {
     #   fast:   预读/术语抽取 — deepseek-v4-flash（机械任务，关思考省钱）
     # 未配置 llm_tiers 时回退到单模型 "model"。
     "use_tiered_models": True,
+    "reasoning_effort": "high",
+    "custom_prompt": "",
     "llm_tiers": {
         "strong": {
             "model": "deepseek-v4-pro",
@@ -96,7 +98,7 @@ DEFAULT_CONFIG = {
     "use_gpu": True,
 
     # === 并行 ===
-    "parallel_workers": 4,  # 并行翻译章节数（0=禁用）
+    "parallel_workers": 0,  # 并行翻译章节数（0=自动：min(章节数,4)）
 
     # === 文件限制 ===
     "max_input_file_mb": 100,  # 输入文件最大 MB（超出警告）

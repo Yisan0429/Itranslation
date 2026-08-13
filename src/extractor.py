@@ -53,7 +53,7 @@ def _extract_with_marker(pdf_path: Path) -> str:
         artifacts = create_model_dict()
         converter = PdfConverter(artifact_dict=artifacts)
         rendered = converter(str(pdf_path))
-        console.print("[green]✅ marker extraction done[/green]")
+        console.print("[green]marker extraction done[/green]")
         return rendered
 
     except ImportError:
@@ -73,7 +73,7 @@ def _extract_with_fitz(pdf_path: Path, use_markdown: bool = True) -> str:
                 import pymupdf4llm
                 console.print("[cyan]📄 extracting with PyMuPDF4LLM (markdown mode)[/cyan]")
                 md = pymupdf4llm.to_markdown(str(pdf_path))
-                console.print("[green]✅ PyMuPDF4LLM extraction done[/green]")
+                console.print("[green]PyMuPDF4LLM extraction done[/green]")
                 return md
             except ImportError:
                 pass
@@ -94,7 +94,7 @@ def _extract_with_fitz(pdf_path: Path, use_markdown: bool = True) -> str:
 
         # 重新连接被 PDF 断开的段落
         text = _join_broken_lines(all_lines)
-        console.print(f"[green]✅ PyMuPDF extraction done ({page_count} pages)[/green]")
+        console.print(f"[green]PyMuPDF extraction done ({page_count} pages)[/green]")
         return text
 
     except ImportError:
@@ -151,7 +151,7 @@ def extract_epub(epub_path: str) -> str:
             if paragraphs:
                 chapters.append("\n\n".join(paragraphs))
 
-        console.print(f"[green]✅ EPUB extraction done ({len(chapters)} chapters)[/green]")
+        console.print(f"[green]EPUB extraction done ({len(chapters)} chapters)[/green]")
         return "\n\n".join(chapters)
 
     except ImportError:
@@ -160,7 +160,6 @@ def extract_epub(epub_path: str) -> str:
 
 def extract_text(txt_path: str) -> str:
     """读取纯文本文件（自动检测编码）。"""
-    console.print("[cyan]📝 Reading text file...[/cyan]")
 
     # 尝试常见编码，优先 UTF-8
     for encoding in ("utf-8", "utf-8-sig", "gbk", "gb2312", "gb18030", "latin-1"):
@@ -175,7 +174,6 @@ def extract_text(txt_path: str) -> str:
     else:
         raise ValueError(f"无法识别文件编码: {txt_path}。请将文件转为 UTF-8 编码。")
 
-    console.print(f"[green]✅ text read complete ({len(text)} chars)[/green]")
     return text
 
 
@@ -199,7 +197,7 @@ def extract_book(book_path: str, use_vision: bool = True, max_mb: int = 100, max
             f"请拆分文件或使用更小的输入。"
         )
     if size_mb > max_mb:
-        console.print(f"[yellow]⚠️ large file ({size_mb:.1f} MB), processing may take a while[/yellow]")
+        console.print(f"[yellow]warning: large file ({size_mb:.1f} MB), processing may take a while[/yellow]")
 
     if suffix == ".pdf":
         return extract_pdf(book_path, use_vision=use_vision)

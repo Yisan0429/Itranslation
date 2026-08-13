@@ -55,11 +55,12 @@
   "preread_sample_ratio": 0.1,
   "preread_max_sample_tokens": 30000,
   "use_gpu": true,
-  "parallel_workers": 4,
+  "parallel_workers": 0,
   "max_input_file_mb": 100,
   "max_input_file_mb_abort": 500,
   "max_retries": 3,
   "retry_base_delay": 2,
   "retry_max_delay": 30,
-  "input_dir": ""
+  "input_dir": "",
+  "custom_prompt": ""
 }

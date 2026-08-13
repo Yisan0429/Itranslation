@@ -58,10 +58,14 @@ def call_api(
     if tier and llm_tiers and tier in llm_tiers:
         tier_cfg = llm_tiers[tier]
         model = tier_cfg.get("model", model)
-        if tier_cfg.get("reasoning_effort"):
+        eff = tier_cfg.get("reasoning_effort")
+        if eff:
             if extra_body is None:
                 extra_body = {}
-            extra_body.setdefault("reasoning_effort", tier_cfg["reasoning_effort"])
+            if eff == "off":
+                extra_body.setdefault("thinking", {"type": "disabled"})
+            else:
+                extra_body.setdefault("reasoning_effort", eff)
 
     if provider == "litellm":
         return _call_via_litellm(

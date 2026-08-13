@@ -58,20 +58,10 @@ def main():
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):
     provider = cfg.get("provider", "custom")
     model = cfg.get("model", "?")
-    reflect = "🔄" if cfg.get("enable_reflection") else "—"
-
-    table = Table(title="📚 Itranslation v1.3.0", show_header=False)
-    table.add_column(style="bold cyan")
-    table.add_column()
-    table.add_row("输入", book_path)
-    table.add_row("Provider", provider)
-    table.add_row("模型", f"{model}")
-    table.add_row("体裁", cfg.get("genre", "auto"))
-    table.add_row("分块大小", f"{target_tokens} tokens/块")
-    table.add_row("重叠", f"{overlap} 句")
-    table.add_row("RAT", "启用" if cfg.get("rat_top_k", 5) > 0 else "禁用")
-    table.add_row("Reflection", reflect)
-    console.print(table)
+    rat = "on" if cfg.get("rat_top_k", 5) > 0 else "off"
+    reflect = "on" if cfg.get("enable_reflection") else "off"
+    console.print(f"Itranslation - {book_path}")
+    console.print(f"model={model} ({provider}) | genre={cfg.get('genre','auto')} | chunk={target_tokens}t/{overlap}o | RAT={rat} | reflection={reflect}")
 
 
 def _check_cli_features(cfg: dict, args):
@@ -82,7 +72,7 @@ def _check_cli_features(cfg: dict, args):
         return
 
     warnings = []
-    if not args.no_vision and not status["marker"]["available"]:
+    if str(getattr(args, "book", "")).lower().endswith(".pdf") and not args.no_vision and not status["marker"]["available"]:
         warnings.append(f"[yellow]⚠️ {status['marker']['message']}[/yellow]")
         if status["marker"]["detail"]:
             warnings.append(f"[dim]{status['marker']['detail']}[/dim]")
@@ -106,21 +96,11 @@ def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: in
     elapsed = time.time() - start_time if start_time else 0
     dur_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
 
-    console.print()
-    console.print("=" * 55)
-    console.print("[bold green]✅ Translation complete![/bold green]")
-    console.print(f"  Chapters: {num_chapters}")
-    console.print(f"  Chunks: {num_chunks}")
-    console.print(f"  Term drifts: {num_issues}")
+    console.print(f"Translation complete | chapters: {num_chapters} | chunks: {num_chunks} | term drifts: {num_issues} | errors: {num_errors} | elapsed: {dur_str}")
+    console.print(f"tokens used: {prompt_tokens:,} in / {completion_tokens:,} out")
+    console.print(f"output: {output_path}")
     if num_errors > 0:
-        console.print(f"  [red]Translation errors: {num_errors} chunks[/red]")
-    console.print(f"  Input tokens: {prompt_tokens:,}")
-    console.print(f"  Output tokens: {completion_tokens:,}")
-    console.print(f"  Elapsed: {dur_str}")
-    console.print(f"  Output: {output_path}")
-    if num_errors > 0:
-        console.print(f"\n[yellow]💡 Re-run to skip completed chunks and retry the remaining {num_errors} failed ones[/yellow]")
-    console.print("=" * 55)
+        console.print(f"\n[yellow]Re-run to skip completed chunks and retry the remaining {num_errors} failed ones[/yellow]")
 
 
 if __name__ == "__main__":
