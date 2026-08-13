@@ -202,7 +202,8 @@ def assemble_book(
 def _write_txt(chapters, path, bilingual):
     with open(path, "w", encoding="utf-8") as f:
         for title, text in chapters:
-            f.write(f"\n\n## {title}\n\n")
+            if title and title != "Body":
+                f.write(f"## {title}\n\n")
             f.write(text)
             f.write("\n\n")
 
@@ -211,7 +212,8 @@ def _write_markdown(chapters, path, bilingual):
     with open(path, "w", encoding="utf-8") as f:
         f.write(f"# {Path(path).stem}\n\n")
         for title, text in chapters:
-            f.write(f"## {title}\n\n")
+            if title and title != "Body":
+                f.write(f"## {title}\n\n")
             for para in text.split("\n"):
                 para = para.strip()
                 if para:
