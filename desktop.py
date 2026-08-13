@@ -315,9 +315,11 @@ async def _start_translation():
 
     # 检查是否有旧的 checkpoint/输出
     book_name = Path(fp).stem
-    cache_dir = PROJECT_ROOT / "cache"
+    _cfg = load_config()
+    cache_dir = Path(_cfg.get("cache_dir", str(PROJECT_ROOT / "cache")))
     existing_checkpoints = list(cache_dir.glob(f"checkpoint_{slugify(book_name)}__*.json"))
-    existing_output = list((PROJECT_ROOT / "output" / book_name).glob(f"{book_name}.*")) if (PROJECT_ROOT / "output" / book_name).exists() else []
+    _out_root = Path(_cfg.get("output_dir", str(PROJECT_ROOT / "output")))
+    existing_output = list((_out_root / book_name).glob(f"{book_name}.*")) if (_out_root / book_name).exists() else []
 
     if existing_checkpoints or existing_output:
         result = await _ask_clear_cache(book_name, existing_checkpoints, existing_output)

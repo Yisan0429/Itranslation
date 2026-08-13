@@ -69,7 +69,7 @@ Reviewer feedback:
 
 # ── Translation Prompts (v1.4 improved) ──────────────────────────────
 
-TRANSLATION_SYSTEM_PROMPT = """You are an expert literary and academic translator specializing in English→Chinese translation. Your translations are published by major Chinese publishing houses.
+TRANSLATION_SYSTEM_PROMPT = """You are an expert literary and academic translator specializing in {lang_pair} translation. Your translations are published by major Chinese publishing houses.
 
 ## Translation Philosophy
 
@@ -287,7 +287,11 @@ def _translate_with_reflection(
             current, genre,
         )
         try:
-            reflection, usage_r = llm_call(REFLECTION_SYSTEM_PROMPT, reflect_user, tier="cheap")
+            _ref_sys = REFLECTION_SYSTEM_PROMPT
+            _focus = config.get("reflection_focus")
+            if _focus:
+                _ref_sys += "\n\n## Book-specific review focus\n- " + "\n- ".join(_focus)
+            reflection, usage_r = llm_call(_ref_sys, reflect_user, tier="cheap")
         except Exception as e:
             console.print(f"  [yellow]⚠️ Reflection failed: {e}, revision skipped[/yellow]")
             break
@@ -423,6 +427,8 @@ def _build_rat_context(chunk, vector_store, glossary: dict, kg: dict, config: di
             merged.append(item)
             seen.add(item["para_id"])
 
+    min_dist = config.get("rat_min_distance", 0.3)
+    merged = [m for m in merged if m.get("distance", 1.0) <= min_dist]
     merged.sort(key=lambda x: x.get("distance", 1.0))
     return merged[:top_k]
 
@@ -455,6 +461,7 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
         rat_section = "Previously translated similar passages — maintain consistent style and terminology:\n\n" + "\n\n".join(parts)
 
     system = TRANSLATION_SYSTEM_PROMPT.format(
+        lang_pair=f"{config.get('source_lang','en')}→{config.get('target_lang','zh')}",
         genre=genre,
         style_instruction=style,
         glossary_section=glossary_section,

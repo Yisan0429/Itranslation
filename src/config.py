@@ -10,7 +10,6 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()  # src/ → project root
 
 DEFAULT_CONFIG = {
     # === 路径 ===
-    "input_dir": str(PROJECT_ROOT / "input"),
     "output_dir": str(PROJECT_ROOT / "output"),  # 翻译成品 — 每本书一个子文件夹
     "reports_dir": str(PROJECT_ROOT / "reports"),  # 报告 (consistency / eval)
     "cache_dir": str(PROJECT_ROOT / "cache"),  # 断点文件
@@ -31,9 +30,6 @@ DEFAULT_CONFIG = {
     # 当 provider='litellm' 时，使用 liteLLM 统一接口调用 100+ 模型。
     # 设置 LITELLM_API_KEY 环境变量或在此配置。
     "litellm_api_key": os.environ.get("LITELLM_API_KEY", ""),
-    # liteLLM 模型路由表: provider_prefix → model_id
-    # 格式: "openai/gpt-4o", "anthropic/claude-sonnet-4-20250514", "gemini/gemini-2.5-pro"
-    "litellm_model": "deepseek/deepseek-chat",
 
     # === 三档模型策略（Wenyi 风格） ===
     # 按任务重要性分三档：
@@ -83,8 +79,6 @@ DEFAULT_CONFIG = {
     "consistency_alert_threshold": 0.8,
 
     # === QA ===
-    "enable_back_translation": False,
-    "enable_llm_judge": False,
     "assembly_strategy": "body_join",  # body_join | first_lock
 
     # === Reflection 反思工作流 ===
@@ -109,7 +103,6 @@ DEFAULT_CONFIG = {
     "max_input_file_mb_abort": 500,  # 硬限制，超过拒绝
 
     # === 高级 ===
-    "batch_delimiter": "\n\n␞␞␞\n\n",
     "max_retries": 3,
     "retry_base_delay": 2,
     "retry_max_delay": 30,

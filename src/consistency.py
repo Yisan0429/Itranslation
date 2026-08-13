@@ -24,7 +24,8 @@ class ConsistencyModel:
         issues = model.audit_all()  # → 发现 consciousness 只有 2/3 = 67% 一致
     """
 
-    def __init__(self):
+    def __init__(self, threshold: float = 0.8):
+        self.threshold = threshold
         # term_en → {translation_zh: count}
         self.term_usage = defaultdict(lambda: defaultdict(int))
         # term_en → [para_id, ...]
@@ -57,7 +58,7 @@ class ConsistencyModel:
         total = sum(usages.values())
         ratio = usages[dominant] / total if total > 0 else 0
 
-        if ratio < 0.8:  # 低于 80% 阈值 = 不一致
+        if ratio < self.threshold:  # 低于阈值 = 不一致
             return {
                 "term": term_en,
                 "translations": dict(usages),
@@ -141,6 +142,7 @@ def generate_consistency_report(
     issues: list[dict],
     glossary: dict,
     output_path: str = None,
+    threshold: float = 0.8,
 ) -> str:
     """生成一致性审计报告。"""
     lines = [
@@ -149,7 +151,7 @@ def generate_consistency_report(
         "=" * 60,
         "",
         f"scanned {len(glossary)} terms",
-        f"found {len(issues)} consistency drift issues (threshold <80%)",
+        f"found {len(issues)} consistency drift issues (threshold <{threshold:.0%})",
         "",
     ]
 

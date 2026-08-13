@@ -118,6 +118,64 @@ By default `use_tiered_models` is `true` and the pipeline uses three tiers (`llm
 uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4-pro     --api-key sk-xxx --api-base https://api.deepseek.com/v1
 ```
 
+### Full configuration reference
+
+All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) < `config.json`. Every key below takes effect — there are no dead options.
+
+**LLM**
+
+| Key | Default | Description |
+|---|---|---|
+| `provider` | `custom` | `custom` (OpenAI-compatible direct) or `litellm` |
+| `model` | `deepseek-v4-pro` | Model name (used when `use_tiered_models` is false) |
+| `api_key` | env `DEEPSEEK_API_KEY` | API key |
+| `api_base` | `https://api.deepseek.com/v1` | OpenAI-compatible base URL |
+| `temperature` | `0.3` | Sampling temperature for all calls |
+| `max_tokens_per_chunk` | `8192` | Max output tokens per translation call |
+| `litellm_api_key` | env `LITELLM_API_KEY` | Key used when `provider=litellm` |
+| `use_tiered_models` | `true` | Route calls through `llm_tiers` |
+| `llm_tiers` | strong/cheap/fast | Per-tier `model` + `reasoning_effort` |
+
+**Translation**
+
+| Key | Default | Description |
+|---|---|---|
+| `source_lang` / `target_lang` | `en` / `zh` | Language pair injected into prompts |
+| `genre` | `auto` | Default genre for style instructions |
+| `chunk_target_tokens` | `1500` | Target tokens per chunk |
+| `chunk_max_tokens` | `3000` | Hard cap per chunk |
+| `overlap_by_genre` | per-genre map | Context-overlap sentence counts |
+| `enable_reflection` | `false` | Per-chunk review → revision loop |
+| `reflection_depth` | `1` | Review rounds (1-2) |
+| `reflection_focus` | 4 dimensions | Extra review focus appended to the reviewer prompt |
+| `enable_agentic_preread` | `true` | Knowledge-graph pre-read |
+| `preread_sample_ratio` | `0.1` | Sampled fraction for pre-read |
+| `preread_max_sample_tokens` | `30000` | Pre-read sample cap |
+
+**Quality & retrieval**
+
+| Key | Default | Description |
+|---|---|---|
+| `rat_top_k` | `5` | RAT context count per chunk |
+| `rat_min_distance` | `0.3` | Max vector distance for RAT hits |
+| `consistency_check_interval` | `20` | Chunks between consistency audits |
+| `consistency_alert_threshold` | `0.8` | Drift flagging threshold |
+| `assembly_strategy` | `body_join` | `body_join` or `first_lock` (legacy) |
+
+**System**
+
+| Key | Default | Description |
+|---|---|---|
+| `parallel_workers` | `4` | Parallel chapter translation (0 = serial) |
+| `use_gpu` | `true` | GPU for the RAT embedding model |
+| `max_input_file_mb` | `100` | Warn threshold for input size |
+| `max_input_file_mb_abort` | `500` | Hard reject threshold |
+| `max_retries` | `3` | API retry count |
+| `retry_base_delay` | `2` | Retry backoff start (seconds) |
+| `retry_max_delay` | `30` | Retry backoff cap (seconds) |
+| `input_dir` / `output_dir` / `reports_dir` / `cache_dir` / `vector_store_dir` | project paths | Storage locations |
+
+
 ### GUI
 
 Fill in Model / API Key / API Base in the left panel, then click **Save API Config** to persist them to `config.json`. A model name with a `provider/name` prefix (e.g. `openai/gpt-5.5`) is routed through liteLLM; a bare name uses the OpenAI-compatible direct path.

@@ -118,6 +118,64 @@ OpenAI（经 liteLLM）：
 uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4-pro     --api-key sk-xxx --api-base https://api.deepseek.com/v1
 ```
 
+### 完整配置参考
+
+运行时配置合并规则：默认值（`src/config.py` 的 `DEFAULT_CONFIG`）< config.json。下表中每个键都真实生效，不存在无效配置项。
+
+**LLM**
+
+| 键 | 默认值 | 说明 |
+|---|---|---|
+| `provider` | `custom` | `custom`（OpenAI 兼容直连）或 `litellm` |
+| `model` | `deepseek-v4-pro` | 模型名（`use_tiered_models` 为 false 时全程使用） |
+| `api_key` | 环境变量 `DEEPSEEK_API_KEY` | API 密钥 |
+| `api_base` | `https://api.deepseek.com/v1` | OpenAI 兼容接口地址 |
+| `temperature` | `0.3` | 所有调用的采样温度 |
+| `max_tokens_per_chunk` | `8192` | 单次翻译调用最大输出 token |
+| `litellm_api_key` | 环境变量 `LITELLM_API_KEY` | `provider=litellm` 时使用的密钥 |
+| `use_tiered_models` | `true` | 按 `llm_tiers` 三档路由 |
+| `llm_tiers` | strong/cheap/fast | 每档的 `model` 与 `reasoning_effort` |
+
+**翻译**
+
+| 键 | 默认值 | 说明 |
+|---|---|---|
+| `source_lang` / `target_lang` | `en` / `zh` | 注入 prompt 的语言对 |
+| `genre` | `auto` | 默认体裁（决定风格指令） |
+| `chunk_target_tokens` | `1500` | 每块目标 token 数 |
+| `chunk_max_tokens` | `3000` | 每块硬上限 |
+| `overlap_by_genre` | 按体裁映射 | 上下文重叠句数 |
+| `enable_reflection` | `false` | 每块"审查 → 修订"循环 |
+| `reflection_depth` | `1` | 反思轮数（1-2） |
+| `reflection_focus` | 4 个维度 | 追加到审查提示的额外关注点 |
+| `enable_agentic_preread` | `true` | 知识图谱预读 |
+| `preread_sample_ratio` | `0.1` | 预读采样比例 |
+| `preread_max_sample_tokens` | `30000` | 预读采样上限 |
+
+**质量与检索**
+
+| 键 | 默认值 | 说明 |
+|---|---|---|
+| `rat_top_k` | `5` | 每块 RAT 上下文条数 |
+| `rat_min_distance` | `0.3` | RAT 命中的最大向量距离 |
+| `consistency_check_interval` | `20` | 一致性审计间隔（块） |
+| `consistency_alert_threshold` | `0.8` | 漂移告警阈值 |
+| `assembly_strategy` | `body_join` | `body_join` 或 `first_lock`（旧版兼容） |
+
+**系统**
+
+| 键 | 默认值 | 说明 |
+|---|---|---|
+| `parallel_workers` | `4` | 章节并行翻译数（0 = 串行） |
+| `use_gpu` | `true` | RAT 嵌入模型使用 GPU |
+| `max_input_file_mb` | `100` | 输入文件大小警告阈值 |
+| `max_input_file_mb_abort` | `500` | 输入文件大小硬拒绝阈值 |
+| `max_retries` | `3` | API 重试次数 |
+| `retry_base_delay` | `2` | 重试退避起始（秒） |
+| `retry_max_delay` | `30` | 重试退避上限（秒） |
+| `input_dir` / `output_dir` / `reports_dir` / `cache_dir` / `vector_store_dir` | 项目内路径 | 各存储位置 |
+
+
 ### GUI
 
 在左侧面板填写 Model / API Key / API Base，点击 **Save API Config** 持久化到 config.json。模型名带 `前缀/名`（如 `openai/gpt-5.5`）时自动走 liteLLM；裸模型名走 OpenAI 兼容直连。

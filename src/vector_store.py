@@ -31,7 +31,7 @@ _HF_MIRROR_HELP = """
 """
 
 
-def _ensure_sentence_transformer():
+def _ensure_sentence_transformer(use_gpu: bool = True):
     """确保 sentence-transformers 模型可用。返回 True 如果就绪。"""
     try:
         from sentence_transformers import SentenceTransformer
@@ -48,7 +48,7 @@ def _ensure_sentence_transformer():
     if safetensors.exists():
         model_path = str(model_dir.resolve())
         try:
-            _ = SentenceTransformer(model_path)
+            _ = SentenceTransformer(model_path, device=None if use_gpu else 'cpu')
             console.print("[cyan]📚 sentence-transformers model ready (local path)[/cyan]")
             return True
         except Exception as e:
@@ -56,7 +56,7 @@ def _ensure_sentence_transformer():
 
     # 尝试在线加载（可能触发下载）
     try:
-        _ = SentenceTransformer("all-MiniLM-L6-v2", cache_folder=str(MODEL_CACHE_DIR))
+        _ = SentenceTransformer("all-MiniLM-L6-v2", cache_folder=str(MODEL_CACHE_DIR), device=None if use_gpu else "cpu")
         return True
     except Exception as e:
         err_msg = str(e)[:200]
@@ -80,8 +80,9 @@ class TranslationVectorStore:
     - 时间戳
     """
 
-    def __init__(self, persist_dir: str = "./vector_store"):
+    def __init__(self, persist_dir: str = "./vector_store", use_gpu: bool = True):
         self.persist_dir = Path(persist_dir)
+        self.use_gpu = use_gpu
         self.client = None
         self.collection = None
         self._initialized = False
@@ -105,7 +106,7 @@ class TranslationVectorStore:
             from chromadb.utils import embedding_functions
 
             # 确保模型已下载
-            if not _ensure_sentence_transformer():
+            if not _ensure_sentence_transformer(use_gpu=self.use_gpu):
                 console.print("[yellow]⚠️ RAT unavailable (model missing); translation continues without retrieval augmentation[/yellow]")
                 return
 
