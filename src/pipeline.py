@@ -4,9 +4,9 @@ from pathlib import Path
 from extractor import extract_book
 from format_protector import protect,restore
 from chunker import chunk_text,parse_structure
-from assembler import assemble_translations,assemble_book
+from assembler import assemble_translations,assemble_book,sentence_mismatch_count
 from translator import translate_chapter
-from consistency import ConsistencyModel,generate_consistency_report
+from consistency import ConsistencyModel,generate_consistency_report,merge_model
 from kg_builder import build_knowledge_graph,kg_to_glossary
 from api_client import call_api
 from vector_store import TranslationVectorStore
@@ -116,7 +116,13 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   log(f'Translation errors ({len(errors)} chunks):')
   for e in errors[:10]: log(f"  {e.get('chapter','?')}/{e.get('chunk_id','?')}: {e.get('error',e)}")
   if len(errors)>10: log(f'  ... {len(errors)-10} more errors')
+  # 续跑合并：加载上次运行的一致性模型，防止部分续跑把审计历史清零
+  _prev_model=Path(cfg['reports_dir'])/'consistency'/'consistency_model.json'
+  if _prev_model.exists():
+   try:
+    merge_model(shared,ConsistencyModel.load(str(_prev_model))); log('Loaded previous consistency model (merged)')
+   except Exception as e: log(f'⚠️ previous consistency model load failed: {str(e)[:120]}')
  progress(.96,'Quality audit...'); issues=shared.audit_all(min_occurrences=3); rd=Path(cfg['reports_dir'])/'consistency'; rd.mkdir(parents=True,exist_ok=True); log(generate_consistency_report(issues,shared.get_glossary_snapshot(),output_path=str(rd/'consistency_report.txt'),threshold=cfg.get('consistency_alert_threshold',0.8))); shared.save(str(rd/'consistency_model.json')); json.dump(shared.get_glossary_snapshot(),open(rd/'glossary_final.json','w',encoding='utf8'),ensure_ascii=False,indent=2)
- progress(.99,'Assembling...'); name=book.stem; out=params.get('output') or str(PROJECT_ROOT/'output'/name/f"{name}.{params.get('format','txt')}"); Path(out).parent.mkdir(parents=True,exist_ok=True); assemble_book([(t,restore(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),ph,verbose=False)) for t,c,tr in results],out,fmt=params.get('format','txt')); progress(1,'Translation complete'); _ps['display']=1.0; c=cfg.get('_cost',{}); return _result(out,chapters,groups,issues,errors,started,cfg)
-def _result(out,chapters,groups,issues,errors,started,cfg):
- c=cfg.get('_cost',{}); return {'output_path':out,'num_chapters':len(chapters),'num_chunks':sum(len(x) for _,x in groups),'num_issues':len(issues),'num_errors':len(errors),'elapsed_sec':time.time()-started,'prompt_tokens':c.get('prompt_tokens',0),'completion_tokens':c.get('completion_tokens',0),'errors':errors}
+ progress(.99,'Assembling...'); name=book.stem; out=params.get('output') or str(PROJECT_ROOT/'output'/name/f"{name}.{params.get('format','txt')}"); Path(out).parent.mkdir(parents=True,exist_ok=True); strict=cfg.get('strict_assembly',False); mm=sum(sentence_mismatch_count(c,tr) for t,c,tr in results); assemble_book([(t,restore(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock'),strict=strict),ph,verbose=False)) for t,c,tr in results],out,fmt=params.get('format','txt')); progress(1,'Translation complete'); _ps['display']=1.0; c=cfg.get('_cost',{}); return _result(out,chapters,groups,issues,errors,started,cfg,mm)
+def _result(out,chapters,groups,issues,errors,started,cfg,mismatches=0):
+ c=cfg.get('_cost',{}); return {'output_path':out,'num_chapters':len(chapters),'num_chunks':sum(len(x) for _,x in groups),'num_issues':len(issues),'num_errors':len(errors),'elapsed_sec':time.time()-started,'prompt_tokens':c.get('prompt_tokens',0),'completion_tokens':c.get('completion_tokens',0),'errors':errors,'sentence_count_mismatches':mismatches}

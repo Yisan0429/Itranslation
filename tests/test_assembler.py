@@ -73,3 +73,28 @@ def test_short_translation_still_outputs():
     translations = ["只有一句"]
     out = assemble_translations(chunks, translations, strategy="body_join")
     assert out == "只有一句"
+
+
+def test_strict_raises_on_missing_sentences():
+    """P2-16: strict=True 且句数不足时抛 ValueError。"""
+    import pytest
+
+    chunks = [_mk_chunk("chunk_0000", 0, 1)]  # 2 句
+    with pytest.raises(ValueError):
+        assemble_translations(chunks, ["一句。"], strategy="body_join", strict=True)
+    # 非 strict 仅警告
+    assert assemble_translations(chunks, ["一句。"], strategy="body_join") == "一句。"
+
+
+def test_sentence_mismatch_count():
+    """P2-16: 错配计数跳过占位符与长句块。"""
+    from assembler import sentence_mismatch_count
+
+    chunks = [
+        _mk_chunk("chunk_0000", 0, 1),  # 2 句
+        _mk_chunk("chunk_0001", 2, 2),  # 1 句，长句
+    ]
+    chunks[1].long_sentence = True
+    trans = ["甲␟乙", "丙\n丁\n戊"]  # 第一块匹配，第二块长句（多行）跳过
+    assert sentence_mismatch_count(chunks, trans) == 0
+    assert sentence_mismatch_count(chunks, ["甲", "[翻译失败: x]"]) == 1

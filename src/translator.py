@@ -190,6 +190,13 @@ def translate_chapter(
                     llm_call, system_prompt, user_prompt, chunk.id, config
                 )
 
+            # 3b. 句数校验与修复（P2-12: warn / retry_once / mark）
+            result, extra_usage = _ensure_sentence_count(
+                result, chunk, system_prompt, user_prompt, llm_call,
+                config, cost_lock,
+            )
+            _merge_usage(usage, extra_usage)
+
             # 累加成本（线程安全）
             if cost_lock:
                 with cost_lock:
@@ -511,8 +518,12 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
     context_section = ""
     if context_text.strip():
         context_section = (
-            "\n\n## Context - previous sentences for understanding only, "
-            "DO NOT translate them\n\n"
+            "\n\n## Context - previous sentences, provided ONLY to help you "
+            "understand the flow of the text.\n"
+            "CRITICAL: Do NOT translate the Context sentences, do NOT include them "
+            "(or any part of them) in your output, and do NOT count them among the "
+            "sentences you output. Output ONLY the translations of the 'Source Text' "
+            "sentences.\n\n"
             + context_text
         )
 
@@ -552,6 +563,77 @@ def _extract_glossary_terms(text: str, glossary: dict) -> list[str]:
         if en_term.lower() in text_lower:
             found.append(en_term)
     return found
+
+
+def _count_output_sentences(text: str) -> int:
+    """统计译文输出句数：优先按 ␟ 分隔，无分隔符时按行。"""
+    from assembler import SENTENCE_SEPARATOR
+    parts = [p.strip() for p in text.split(SENTENCE_SEPARATOR) if p.strip()]
+    if len(parts) <= 1:
+        parts = [l.strip() for l in text.split("\n") if l.strip()]
+    return len(parts)
+
+
+def _ensure_sentence_count(
+    result: str,
+    chunk,
+    system_prompt: str,
+    user_prompt: str,
+    llm_call: Callable,
+    config: dict,
+    cost_lock: threading.Lock | None,
+) -> tuple[str, dict]:
+    """P2-12: 译文句数与正文句数不符时的修复策略。
+
+    mode = config['on_count_mismatch']:
+      - warn:       仅警告，保留原译文
+      - retry_once: 附带强化指令重译一次；仍不符则加标记（默认）
+      - mark:       译文前加【⚠️句数不符】标记供人工定位
+    长句块（long_sentence）与失败占位符不做校验。
+    """
+    if result.startswith("[翻译失败:"):
+        return result, {}
+    if getattr(chunk, "long_sentence", False):
+        return result, {}
+    expected = getattr(chunk, "body_sentence_count", None)
+    if expected is None:
+        return result, {}
+    got = _count_output_sentences(result)
+    if got == expected:
+        return result, {}
+
+    mode = config.get("on_count_mismatch", "retry_once")
+    if mode == "mark":
+        console.print(f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: sentence count mismatch ({got} != {expected}), marked[/yellow]")
+        return f"【⚠️句数不符 期望{expected} 实得{got}】\n" + result, {}
+
+    if mode == "retry_once":
+        retry_user = (
+            user_prompt
+            + f"\n\n[RETRY] Your previous output contained {got} sentences, but the "
+            f"'Source Text' section contains exactly {expected} sentences. Output EXACTLY "
+            f"{expected} translated sentences, each on its own line separated by '␟'. "
+            f"Do not merge or split sentences, and do not translate the Context section."
+        )
+        try:
+            revised, retry_usage = _call_with_retry(
+                llm_call, system_prompt, retry_user, getattr(chunk, "id", "?"), config,
+            )
+        except Exception as e:
+            console.print(f"  [yellow]⚠️ sentence-count retry failed: {str(e)[:120]}[/yellow]")
+            return result, {}
+        if _count_output_sentences(revised) == expected:
+            console.print(f"  [dim]🔄 sentence-count retry fixed ({got} -> {expected})[/dim]")
+            return revised, retry_usage
+        console.print(f"  [yellow]⚠️ sentence-count retry still mismatched, marked[/yellow]")
+        return (
+            f"【⚠️句数不符 期望{expected} 实得{_count_output_sentences(revised)}】\n" + revised,
+            retry_usage,
+        )
+
+    # warn（默认兜底）
+    console.print(f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: sentence count mismatch ({got} != {expected})[/yellow]")
+    return result, {}
 
 
 def _call_with_retry(llm_call: Callable, system_prompt: str, user_prompt: str, chunk_id: str, config: dict, tier: str = None) -> tuple[str, dict]:

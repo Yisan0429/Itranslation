@@ -92,3 +92,50 @@ def test_translator_term_extraction_default_off():
         {"genre": "auto"},  # 无 enable_term_extraction 键 → 默认关闭
     )
     assert not any("terminology extraction" in c for c in calls)
+
+
+def test_version_threshold_and_candidates(tmp_path):
+    """P2-15: save/load 保留 version 与 threshold；候选列表按次数排序。"""
+    from pathlib import Path as P
+
+    cm = ConsistencyModel(threshold=0.9)
+    cm.record_many("entropy", "熵", ["c0", "c1"], 2, source="observed")
+    cm.record_many("entropy", "熵值", ["c2"], 1, source="observed")
+    cm.record_many("entropy", "无序度", ["c3"], 1, source="observed")
+
+    assert cm.suggest_candidates("entropy") == ["熵", "熵值", "无序度"]
+    assert cm.suggest_correction("entropy") == "熵"
+    assert cm.suggest_candidates("nonexistent") == []
+
+    p = P(tmp_path) / "m.json"
+    cm.save(str(p))
+    data = json.loads(p.read_text(encoding="utf-8"))
+    assert data["version"] == 1 and data["threshold"] == 0.9
+
+    loaded = ConsistencyModel.load(str(p))
+    assert loaded.threshold == 0.9
+    assert loaded.suggest_candidates("entropy") == ["熵", "熵值", "无序度"]
+
+    # 旧文件（无 version/threshold）兼容加载
+    legacy = {k: v for k, v in data.items() if k not in ("version", "threshold")}
+    p2 = P(tmp_path) / "legacy.json"
+    p2.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
+    assert ConsistencyModel.load(str(p2)).threshold == 0.8  # 构造默认
+
+
+def test_merge_model_no_double_count(tmp_path):
+    """新问题1：续跑合并不覆盖本次记录、不重复计数。"""
+    from consistency import merge_model
+
+    target = ConsistencyModel()
+    target.record_many("entropy", "熵", ["c0"], 2, source="observed")
+
+    other = ConsistencyModel()
+    other.record_many("entropy", "熵值", ["c9"], 3, source="observed")  # 会被跳过
+    other.record_many("quantum", "量子", ["c8"], 2, source="observed")  # 会并入
+
+    merge_model(target, other)
+    assert target.term_usage["entropy"]["熵"] == 2
+    assert "熵值" not in target.term_usage["entropy"]
+    assert target.term_usage["quantum"]["量子"] == 2
+    assert target.term_source["quantum"] == "observed"

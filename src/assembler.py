@@ -30,6 +30,7 @@ def assemble_translations(
     chunks: list,
     translations: list[str],
     strategy: str = "body_join",
+    strict: bool = False,
 ) -> str:
     """
     将分块译文组装为完整译文，处理重叠句。
@@ -39,6 +40,7 @@ def assemble_translations(
         translations: 对应的译文列表（与 chunks 同序，每个译文用 ␟ 分隔句子）
         strategy: "body_join" — 按每块正文句译文直接拼接（默认推荐，句序与原文一一对应）
                   "first_lock" — 兼容策略：每句第一次出现时定稿（旧 checkpoint 续翻）
+        strict: True 时译文句数少于正文句数直接抛 ValueError（调试/质量门禁用）
 
     Returns:
         完整译文文本
@@ -50,15 +52,15 @@ def assemble_translations(
         f"chunks ({len(chunks)}) and translations ({len(translations)}) must match"
 
     if strategy == "first_lock":
-        return _assemble_first_lock(chunks, translations)
+        return _assemble_first_lock(chunks, translations, strict)
     elif strategy == "body_join":
-        return _assemble_body_join(chunks, translations)
+        return _assemble_body_join(chunks, translations, strict)
     else:
         console.print(f"  [yellow]⚠️ unknown assembly strategy '{strategy}', falling back to body_join[/yellow]")
-        return _assemble_body_join(chunks, translations)
+        return _assemble_body_join(chunks, translations, strict)
 
 
-def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
+def _assemble_first_lock(chunks: list, translations: list[str], strict: bool = False) -> str:
     """
     兼容策略（旧 checkpoint 续翻）：每句话在第一次出现时定稿，后续忽略。
 
@@ -84,6 +86,11 @@ def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
                 f" (legacy prompt output), skipped[/yellow]"
             )
         elif len(sentences) < body_count:
+            if strict:
+                raise ValueError(
+                    f"{getattr(chunk, 'id', '?')}: expected {body_count} sentences, "
+                    f"got {len(sentences)}"
+                )
             console.print(
                 f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: expected {body_count} sentences, got {len(sentences)}"
                 f" — LLM may have merged or dropped sentences[/yellow]"
@@ -100,7 +107,7 @@ def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
     return "\n".join(result)
 
 
-def _assemble_body_join(chunks: list, translations: list[str]) -> str:
+def _assemble_body_join(chunks: list, translations: list[str], strict: bool = False) -> str:
     """
     新策略（默认推荐）：按每块正文句译文直接拼接，块间去掉重叠上下文句。
 
@@ -120,6 +127,11 @@ def _assemble_body_join(chunks: list, translations: list[str]) -> str:
                 f" (legacy prompt output), skipped[/yellow]"
             )
         elif len(sentences) < body_count:
+            if strict:
+                raise ValueError(
+                    f"{getattr(chunk, 'id', '?')}: expected {body_count} sentences, "
+                    f"got {len(sentences)}"
+                )
             console.print(
                 f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 期望 {body_count} 句, 实际 {len(sentences)}"
                 f" — sentence order may be misaligned[/yellow]"
@@ -127,6 +139,23 @@ def _assemble_body_join(chunks: list, translations: list[str]) -> str:
         out.extend(sentences)
 
     return "\n".join(out)
+
+
+def sentence_mismatch_count(chunks: list, translations: list[str]) -> int:
+    """统计句数与正文不符的块数（跳过失败占位符与 long_sentence 块）。
+
+    用于 pipeline 结果中的 sentence_count_mismatches 字段。
+    """
+    mismatches = 0
+    for chunk, trans in zip(chunks, translations):
+        if not isinstance(trans, str) or trans.startswith("[翻译失败:"):
+            continue
+        if getattr(chunk, "long_sentence", False):
+            continue
+        body_start, body_count = _chunk_body_range(chunk)
+        if len(_split_by_separator(trans)) != body_count:
+            mismatches += 1
+    return mismatches
 
 
 def _chunk_body_range(chunk) -> tuple:

@@ -39,7 +39,7 @@ state = {
     "api_base": cfg.get("api_base", "https://api.deepseek.com/v1"),
     "output_format": "txt",
     "output_dir": str(PROJECT_ROOT / "output"),
-    "enable_preread": False,
+    "enable_preread": True,
     "enable_rat": False,
     "use_vision": False,
     "enable_reflection": False,
@@ -141,7 +141,7 @@ def _build_control_panel():
         ui.button("Save API Config", on_click=_save_api_config).classes("text-xs mt-1")
 
         with ui.row().classes("gap-3 mt-2"):
-            ui.switch("Pre-read", value=False,
+            ui.switch("Pre-read", value=True,
                       on_change=lambda e: state.update(enable_preread=e.value))
             ui.switch("RAT", value=False,
                       on_change=lambda e: state.update(enable_rat=e.value))
@@ -171,7 +171,25 @@ def _build_control_panel():
         with ui.row().classes("w-full justify-between mt-1"):
             state["time_label"] = ui.label("--").classes("text-xs text-gray-500 font-mono")
 
+        _optional_features_banner()
 
+
+
+
+def _optional_features_banner():
+    """启动预检：在控制面板底部提示 RAT / marker 就绪状态。"""
+    try:
+        from env_check import get_optional_features_status
+        status = get_optional_features_status()
+    except Exception:
+        return
+    parts = []
+    if not status["marker"]["available"]:
+        parts.append("Marker: unavailable (uv sync --extra vision)")
+    if not status["rat"]["available"]:
+        parts.append("RAT: unavailable (uv sync --extra rat)")
+    if parts:
+        ui.label("⚠️ " + " | ".join(parts)).classes("text-2xs text-amber-600 mt-1")
 
 
 def _build_preview_panel():

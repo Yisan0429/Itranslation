@@ -62,5 +62,7 @@
   "retry_base_delay": 2,
   "retry_max_delay": 30,
   "input_dir": "",
-  "custom_prompt": ""
+  "custom_prompt": "",
+  "on_count_mismatch": "retry_once",
+  "strict_assembly": false
 }

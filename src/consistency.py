@@ -113,12 +113,17 @@ class ConsistencyModel:
 
         return sorted(issues, key=lambda x: x["consistency"])
 
-    def suggest_correction(self, term_en: str) -> str | None:
-        """返回使用次数最多的译法。"""
+    def suggest_candidates(self, term_en: str, top_k: int = 3) -> list[str]:
+        """返回按出现次数降序的候选译法列表（top_k 个）。"""
         usages = self.term_usage[term_en]
         if not usages:
-            return None
-        return max(usages, key=usages.get)
+            return []
+        return [zh for zh, _ in sorted(usages.items(), key=lambda kv: kv[1], reverse=True)[:top_k]]
+
+    def suggest_correction(self, term_en: str) -> str | None:
+        """返回使用次数最多的译法。"""
+        candidates = self.suggest_candidates(term_en, top_k=1)
+        return candidates[0] if candidates else None
 
     def get_glossary_snapshot(self) -> dict:
         """生成当前术语表快照（可用于注入 prompt）。"""
@@ -136,6 +141,8 @@ class ConsistencyModel:
     def save(self, path: str):
         """保存一致性状态到 JSON。"""
         data = {
+            "version": 1,
+            "threshold": self.threshold,
             "term_usage": {k: dict(v) for k, v in self.term_usage.items()},
             "term_locations": dict(self.term_locations),
             "term_source": dict(self.term_source),
@@ -162,7 +169,24 @@ class ConsistencyModel:
             model.term_source[term] = src
 
         model.total_segments = data.get("total_segments", 0)
+        if data.get("threshold"):
+            model.threshold = data["threshold"]
         return model
+
+
+def merge_model(target: "ConsistencyModel", other: "ConsistencyModel"):
+    """把 other 的术语并入 target（续跑合并用）。
+
+    target 已有记录的术语保持不变（避免重复运行计数膨胀）；
+    仅并入 target 缺失的术语及其 locations/source。
+    """
+    for term, usages in other.term_usage.items():
+        if term in target.term_usage:
+            continue
+        for zh, count in usages.items():
+            target.term_usage[term][zh] += count
+        target.term_locations[term] = list(other.term_locations[term])
+        target.term_source[term] = other.term_source.get(term, "expected")
 
 
 def generate_consistency_report(
@@ -189,7 +213,11 @@ def generate_consistency_report(
             for zh, count in issue["translations"].items():
                 marker = " ✅ dominant" if zh == issue["dominant"] else " ⚠️"
                 out.append(f"       {zh}: {count}x{marker}")
-            out.append(f"     suggest: unify on '{issue['dominant']}'")
+            ranked = sorted(
+                issue["translations"].items(), key=lambda kv: kv[1], reverse=True
+            )[:3]
+            cands = ", ".join(f"{zh} ({cnt}x)" for zh, cnt in ranked)
+            out.append(f"     candidates: {cands}")
             out.append(f"     total occurrences: {issue['total_occurrences']}")
         return out
 

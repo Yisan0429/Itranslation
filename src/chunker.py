@@ -134,9 +134,8 @@ def _split_sentences(text: str) -> list[str]:
                 all_sentences.append("⟨LIST⟩" + " || ".join(list_buffer))
                 list_buffer = []
 
-        # 句子分词：按 .!? 后跟空格或换行
-        sents = re.split(r'(?<=[.!?])\s+', para)
-        sents = [s.strip() for s in sents if s.strip()]
+        # 句子分词：引号感知（引号内的 .!? 不切）+ 缩写合并
+        sents = _split_para_into_sentences(para)
         all_sentences.extend(sents)
         all_sentences.append("¶")
 
@@ -145,6 +144,39 @@ def _split_sentences(text: str) -> list[str]:
         all_sentences.append("⟨LIST⟩" + " || ".join(list_buffer))
 
     return all_sentences
+
+
+# 常见缩写（句尾点不表示句子结束）
+_ABBREV_RE = re.compile(
+    r"\b(?:Mr|Mrs|Ms|Dr|Prof|St|vs|etc|e\.g|i\.e|U\.S|U\.K|No|Vol|ch|fig|ed|"
+    r"approx|dept|Inc|Ltd|Co|Jr|Sr)\.$",
+    re.IGNORECASE,
+)
+
+
+def _split_para_into_sentences(para: str) -> list[str]:
+    """把段落切为句子。
+
+    - 引号感知：双引号内的 .!? 不切（对话如 "Hello. World." he said. 只切 1 次）
+    - 缩写合并：以 Mr. / e.g. / etc. 等结尾的片段与后续片段合并
+    """
+    sents, last = [], 0
+    for m in re.finditer(r"(?<=[.!?])\s+", para):
+        prefix = para[:m.start()]
+        if prefix.count('"') % 2 == 0:  # 引号外的句末标点才切
+            sents.append(para[last:m.start()].strip())
+            last = m.end()
+    tail = para[last:].strip()
+    if tail:
+        sents.append(tail)
+
+    merged = []
+    for s in sents:
+        if merged and _ABBREV_RE.search(merged[-1]):
+            merged[-1] = merged[-1] + " " + s
+        else:
+            merged.append(s)
+    return merged
 
 
 def _estimate_tokens(text: str) -> int:

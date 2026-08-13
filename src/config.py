@@ -88,6 +88,10 @@ DEFAULT_CONFIG = {
 
     # === QA ===
     "assembly_strategy": "body_join",  # body_join | first_lock
+    # 译文句数与正文句数不符时的处理: warn(仅警告) | retry_once(重译一次,默认) | mark(译文前加标记)
+    "on_count_mismatch": "retry_once",
+    # 严格组装: true 时句数不符直接报错(调试/测试用)
+    "strict_assembly": False,
 
     # === Reflection 反思工作流 ===
     # 启用后每个 chunk 翻译 → LLM 自审 → 修订。显著提升质量，约 2x token 消耗。

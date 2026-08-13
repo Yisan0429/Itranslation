@@ -96,3 +96,22 @@ def test_long_sentence_atomic():
         body = c.sentences[c.overlap_sentences:] if c.overlap_sentences else c.sentences
         joined.extend(body)
     assert long_sent in joined
+
+
+def test_abbreviation_not_split():
+    """P2-11: Mr. / e.g. / U.S. 等缩写不产生句子切分。"""
+    from chunker import _split_sentences
+
+    sents = [s for s in _split_sentences("Dr. Smith arrived. Then he left. U.S. policy changed.") if s not in ("§", "¶")]
+    assert len(sents) == 3
+    assert sents[0] == "Dr. Smith arrived."
+    assert sents[2] == "U.S. policy changed."
+
+
+def test_quote_dialogue_not_split():
+    """P2-11: 引号内的句号不切分句子。"""
+    from chunker import _split_sentences
+
+    text = '"Hello. World." he said. She nodded.'
+    sents = [s for s in _split_sentences(text) if s not in ("§", "¶")]
+    assert sents == ['"Hello. World." he said.', "She nodded."]

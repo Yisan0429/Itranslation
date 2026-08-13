@@ -163,6 +163,8 @@ uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4
 | `enable_term_extraction` | `false` | 从真实译文增量抽取术语对（cheap 档模型；默认关闭，开启会增加 API 调用） |
 | `term_extraction_interval` | `20` | 术语抽取间隔（块） |
 | `term_extraction_max_terms` | `30` | 每次抽取最多记录术语数 |
+| `on_count_mismatch` | `retry_once` | 译文句数与正文不符时的处理：`warn` / `retry_once` / `mark` |
+| `strict_assembly` | `false` | 句数缺失时直接报错而非警告（调试/质检用） |
 | `assembly_strategy` | `body_join` | `body_join` 或 `first_lock`（旧版兼容） |
 
 **系统**

@@ -163,6 +163,8 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 | `enable_term_extraction` | `false` | Incremental term-pair extraction from real translations (cheap tier; opt-in, adds API calls) |
 | `term_extraction_interval` | `20` | Chunks between term-extraction calls |
 | `term_extraction_max_terms` | `30` | Max terms recorded per extraction |
+| `on_count_mismatch` | `retry_once` | Sentence-count mismatch handling: `warn` / `retry_once` / `mark` |
+| `strict_assembly` | `false` | Raise on missing sentences instead of warning (debug/QA) |
 | `assembly_strategy` | `body_join` | `body_join` or `first_lock` (legacy) |
 
 **System**

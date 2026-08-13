@@ -20,6 +20,12 @@
 - 测试补强至 28 项：pipeline 并行保序与配置优先级、benchmark 回归、长句原子化、术语抽取与一致性接线
 - `scripts/check_version.py` 版本一致性检查脚本
 - CI（GitHub Actions）：ruff + pytest + benchmark --quick + 版本检查
+- 句数校验与修复（P2-12）：`on_count_mismatch` 配置 `warn / retry_once / mark`（默认 retry_once），译文句数与正文不符时自动重译一次；上下文句提示词强化（明确禁止翻译 Context）
+- 句子切分增强（P2-11）：引号内 .!? 不切分（对话）、Mr./e.g./U.S. 等缩写合并
+- GUI（P2-14）：Pre-read 默认开启与 CLI 对齐；控制面板底部增加 RAT / marker 就绪预检横幅
+- 一致性模型（P2-15）：`consistency_model.json` 增加 version/threshold 字段；漂移建议改为候选列表（top-3）
+- 严格组装（P2-16）：`strict_assembly` 配置 + CLI `--strict`，句数缺失时直接报错；结果新增 `sentence_count_mismatches` 计数
+- 续跑合并（新问题 1）：部分续跑时合并上次运行的一致性模型，审计报告不再被清零
 
 ## v1.4.2 (2026-08-13)
 
