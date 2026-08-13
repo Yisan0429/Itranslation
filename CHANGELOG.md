@@ -7,6 +7,12 @@
 - benchmark 全量模式 NameError（cost_val 残留引用），评估循环从未真实跑通；移除残留价格字段
 - 超长句从句切割致同句索引重复、组装错位：超长句原子化整体保留（Chunk.long_sentence + 翻译提示注入）
 - chunk_target_tokens 死键复活：CLI --target-tokens 默认未指定，config.json 值生效
+- 续跑时跳过块不落 checkpoint 导致重复翻译：章末兜底保存完整进度
+- eval.py 同源修复：pt/ct 未定义 + llm 闭包补 tier 参数
+- `_get_style_instruction` 重复定义遮蔽：删除简版，恢复详版体裁提示词
+
+### 移除
+- 缺陷族审计（`src/defects.py` / `src/auditor.py` 及正反例语料与测试）：正则扫描精确率未经真实译文验证、只报告不行动，且与详版提示词的翻译腔约束重叠；知识保留于 git 历史与 v1.3.3 CHANGELOG
 
 ### 新增
 - 术语抽取 `term_extractor`：每 N 块用 cheap tier 从真实译文增量抽取高频术语对并计入一致性模型；审计报告分「预期偏离 / 实际漂移」两节；预读关闭时一致性审计不再空转（**默认关闭**，需 `enable_term_extraction: true` 显式开启）
@@ -33,6 +39,19 @@
 - 日志输出整理：header 改两行英文、全去 emoji、审计报告表格改行式、删除 6 处冗余行、marker-pdf 警告仅 PDF 输入触发、CLI 头部不再内嵌版本号
 - 默认章节名 Body；输出文件无标题章节不再写 "## Body" 与开头空行
 
+
+## v1.4.1 (2026-08-13)
+
+### 修复
+- config.json 死配置键全部接入调用链：13 个键生效（temperature、API 重试三参数、litellm_api_key、source_lang/target_lang 注入翻译提示、rat_min_distance 距离过滤、consistency_alert_threshold、use_gpu、max_input_file_mb 与 abort、reflection_focus、cache_dir/reports_dir/output_dir）；删除 5 个无功能键（input_dir、litellm_model、enable_back_translation、enable_llm_judge、batch_delimiter）
+- 路径键运行时按执行环境解析：消除 Windows UNC 绝对路径在 WSL 下拼接 POSIX 分隔符产生的 checkpoint 路径无效（Errno 2）
+
+### 优化
+- 价格预估全部移除：calc_cost 函数、pricing 定价表、预检/CLI/GUI 费用行、eval/benchmark 成本统计（-1191 行）；token 消耗统计保留
+- 日志全部英文化：pipeline/CLI/chunker/translator/assembler/consistency/vector_store/kg_builder/extractor/format_protector/api_client/eval/benchmark 全部运行时输出无中文残留
+
+### 文档
+- README 双份新增「完整配置参考」章节：37 个配置键分 LLM/翻译/质量与检索/系统四组表格列出
 
 ## v1.4.0 (2026-08-13)
 

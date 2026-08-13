@@ -209,7 +209,7 @@ TXT、Markdown、PDF（内嵌 CJK 字体）、EPUB（章节目录导航）。
 
 ### 并行翻译
 
-多章节线程池并发翻译（默认 4 线程；`parallel_workers: 0` 关闭）。
+多章节线程池并发翻译（默认自动：min(章节数, 4)；`parallel_workers: 0` 关闭）。
 
 ### 断点续传
 
@@ -217,7 +217,7 @@ TXT、Markdown、PDF（内嵌 CJK 字体）、EPUB（章节目录导航）。
 
 ### 质量审计
 
-翻译完成后自动运行缺陷族扫描（10 组正则：被字句滥用、长定语、硬译句式、名词化等），按 P1/P2/P3 分级标注候选，零 API 开销；增量一致性模型在任一术语主导译法低于 80% 时告警。
+翻译完成后，增量一致性模型在任一术语主导译法低于 80% 时告警。开启 `enable_term_extraction: true`（可选）后，还会用 cheap 档模型从真实译文增量抽取术语对，预读关闭时审计依然有效。报告写入 `reports/consistency/`。
 
 ### RAT（检索增强翻译）
 
@@ -233,7 +233,7 @@ TXT、Markdown、PDF（内嵌 CJK 字体）、EPUB（章节目录导航）。
   ├─ Phase 0: 提取与预读 — PyMuPDF 或 Marker → 文本清洗 → 可选知识图谱构建
   ├─ Phase 1: 语义分块 — 句子级分词 → 贪心打包 → 块间重叠（3–4 句）
   ├─ Phase 2: 并行翻译 + Reflection — 逐块：术语注入 + RAT 上下文 → LLM → 向量库存储
-  ├─ Phase 3: 质量审计 — 缺陷族扫描（10 组正则）+ 一致性模型审计
+  ├─ Phase 3: 质量审计 — 一致性模型漂移检测（+ 可选术语抽取）
   └─ Phase 4: 组装输出 — 按句对齐 body_join（旧 checkpoint 回退 first_lock）→ 输出
 ```
 
@@ -263,17 +263,16 @@ Itranslation/
 │   ├── chunker.py        句子级分块（上下文重叠句显式标注）
 │   ├── translator.py     翻译引擎（RAT + 术语注入 + Reflection + 块级进度回调）
 │   ├── consistency.py    增量术语一致性模型
+│   ├── term_extractor.py 从真实译文增量抽取术语对（cheap 档，可选开启）
 │   ├── assembler.py      按句对齐组装（body_join + first_lock）
 │   ├── vector_store.py   RAT 的 ChromaDB 向量库
 │   ├── format_protector.py  代码/公式/URL 占位符保护
 │   ├── api_client.py     统一 API 客户端（HTTP + liteLLM）
-│   ├── auditor.py        低 token 缺陷族扫描引擎
-│   ├── defects.py        缺陷族注册表（10 族）
 │   ├── benchmark.py      BLEU/chrF + LLM-as-Judge 质量评估
 │   ├── config.py         配置（DEFAULT_CONFIG + config.json）
 │   ├── env_check.py      可选功能就绪检查
 │   └── eval.py           组件评估套件
-├── tests/                单元测试（chunker / assembler / checkpoint / defects / format protector）
+├── tests/                单元测试（chunker / assembler / checkpoint / consistency / format protector）
 ├── input/                源文档
 ├── output/               译文（每本书一个目录）
 ├── reports/              审计报告与基准结果

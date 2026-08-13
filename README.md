@@ -34,7 +34,7 @@ Itranslation is a desktop application and command-line tool for translating enti
 |---|---|---|
 | Chunking | Fixed line count | Sentence-level tokenization with configurable overlap |
 | Terminology Consistency | LLM memory across calls | Incremental tracking model with drift detection |
-| Translation Quality | Single-pass, no validation | Overlap redundancy + RAT + KG pre-read + real-time audit |
+| Translation Quality | Single-pass, no validation | Overlap redundancy + RAT + KG pre-read + consistency audit |
 | Post-Translation QA | Output as-is | Reflection workflow (translate → reflect → revise) |
 | Interruption Handling | Restart from beginning | Checkpoint-based resume (GUI & CLI) |
 | Cost Visibility | Unknown until billing | Real-time per-chunk token counts (pricing display removed in v1.4) |
@@ -209,7 +209,7 @@ Optional translate → reflect → revise loop; roughly 2× token consumption fo
 
 ### Parallel Translation
 
-Chapters are translated concurrently with a configurable thread pool (default 4 workers; `parallel_workers: 0` disables).
+Chapters are translated concurrently with a configurable thread pool (default auto: min(chapters, 4); set `parallel_workers: 0` to disable).
 
 ### Checkpoint & Resume
 
@@ -217,7 +217,7 @@ Progress is persisted after every chunk. Interrupted runs resume with completed 
 
 ### Quality Audit
 
-After translation, a defect-family scan (10 regex families: passive-voice overuse, long modifiers, calques, nominalization, etc.) flags candidates at P1/P2/P3 severity with zero API cost; the incremental consistency model alerts when any term's dominant translation falls below 80%.
+After translation, the incremental consistency model alerts when any term's dominant translation falls below 80%. With `enable_term_extraction: true` (opt-in), term pairs are additionally extracted from the real translations via the cheap-tier model, so the audit stays meaningful even when pre-read is off. Reports are written to `reports/consistency/`.
 
 ### RAT (Retrieval-Augmented Translation)
 
@@ -233,7 +233,7 @@ Input (PDF / EPUB / TXT / MD)
   ├─ Phase 0: Extraction & Pre-Read — PyMuPDF or Marker → text cleaning → optional KG construction
   ├─ Phase 1: Semantic Chunking — sentence tokenization → greedy packing → overlap (3–4 sentences)
   ├─ Phase 2: Translation (parallel) + Reflection — per-chunk: terminology injection + RAT context → LLM → vector store
-  ├─ Phase 3: Quality Audit — defect-family scan (10 regex families) + consistency model audit
+  ├─ Phase 3: Quality Audit — consistency model drift detection (+ opt-in term extraction)
   └─ Phase 4: Assembly — sentence-aligned body_join (first-lock fallback for legacy checkpoints) → output
 ```
 
@@ -263,17 +263,16 @@ Itranslation/
 │   ├── chunker.py        Sentence-level chunking with labeled context overlap
 │   ├── translator.py     Translation engine (RAT + terminology + reflection + chunk progress callback)
 │   ├── consistency.py    Incremental terminology consistency model
+│   ├── term_extractor.py Incremental term-pair extraction from real translations (cheap tier, opt-in)
 │   ├── assembler.py      Sentence-aligned assembly (body_join + first_lock)
 │   ├── vector_store.py   ChromaDB vector store for RAT
 │   ├── format_protector.py  Code/formula/URL placeholder protection
 │   ├── api_client.py     Unified API client (HTTP + liteLLM)
-│   ├── auditor.py        Low-token defect-family scan engine
-│   ├── defects.py        Defect family registry (10 families)
 │   ├── benchmark.py      BLEU/chrF + LLM-as-Judge quality evaluation
 │   ├── config.py         Configuration (DEFAULT_CONFIG + config.json)
 │   ├── env_check.py      Optional feature readiness checker
 │   └── eval.py           Component evaluation suite
-├── tests/                Unit tests (chunker / assembler / checkpoint / defects / format protector)
+├── tests/                Unit tests (chunker / assembler / checkpoint / consistency / format protector)
 ├── input/                Source documents
 ├── output/               Translations (one folder per book)
 ├── reports/              Audit reports + benchmark results

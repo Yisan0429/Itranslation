@@ -116,13 +116,6 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   log(f'Translation errors ({len(errors)} chunks):')
   for e in errors[:10]: log(f"  {e.get('chapter','?')}/{e.get('chunk_id','?')}: {e.get('error',e)}")
   if len(errors)>10: log(f'  ... {len(errors)-10} more errors')
- from auditor import Auditor
- auditor=Auditor()
- for t,c,tr in results: auditor.scan_chapter(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),t)
- if auditor.total_issues>0:
-  import io as _io
-  from rich.console import Console as _Console
-  log(str(auditor.report()))
  progress(.96,'Quality audit...'); issues=shared.audit_all(min_occurrences=3); rd=Path(cfg['reports_dir'])/'consistency'; rd.mkdir(parents=True,exist_ok=True); log(generate_consistency_report(issues,shared.get_glossary_snapshot(),output_path=str(rd/'consistency_report.txt'),threshold=cfg.get('consistency_alert_threshold',0.8))); shared.save(str(rd/'consistency_model.json')); json.dump(shared.get_glossary_snapshot(),open(rd/'glossary_final.json','w',encoding='utf8'),ensure_ascii=False,indent=2)
  progress(.99,'Assembling...'); name=book.stem; out=params.get('output') or str(PROJECT_ROOT/'output'/name/f"{name}.{params.get('format','txt')}"); Path(out).parent.mkdir(parents=True,exist_ok=True); assemble_book([(t,restore(assemble_translations(c,tr,strategy=cfg.get('assembly_strategy','first_lock')),ph,verbose=False)) for t,c,tr in results],out,fmt=params.get('format','txt')); progress(1,'Translation complete'); _ps['display']=1.0; c=cfg.get('_cost',{}); return _result(out,chapters,groups,issues,errors,started,cfg)
 def _result(out,chapters,groups,issues,errors,started,cfg):
