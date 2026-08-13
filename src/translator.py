@@ -126,7 +126,7 @@ def translate_chapter(
     Returns:
         (translations, errors) — errors 列表每项含 {chunk_id, error, stage}
     """
-    console.print(f"\n[bold]📖 翻译章节: {chapter_title} ({len(chunks)} 块)[/bold]")
+    console.print(f"\n[bold]📖 Translating chapter: {chapter_title} ({len(chunks)} chunks)[/bold]")
 
     if vector_store is not None:
         vector_store.initialize()
@@ -160,7 +160,7 @@ def translate_chapter(
             prev = checkpoint.get("translations", {})
             if chunk.id in prev:
                 translations.append(prev[chunk.id])
-                console.print(f"  [{i+1}/{len(chunks)}] ⏭️ 跳过（已翻译）")
+                console.print(f"  [{i+1}/{len(chunks)}] ⏭️ skipped (cached)")
                 if chunk_cb:
                     chunk_cb(i + 1, len(chunks), chunk.id, "skip")
                 continue
@@ -201,7 +201,7 @@ def translate_chapter(
                         target=result,
                     )
                 except Exception as e:
-                    console.print(f"  [dim]⚠️ 向量库写入失败 (非致命): {e}[/dim]")
+                    console.print(f"  [dim]⚠️ vector store write failed (non-fatal): {e}[/dim]")
 
             # 5. 更新一致性模型
             _update_consistency(chunk.text, result, glossary, consistency_model, chunk.id)
@@ -225,9 +225,9 @@ def translate_chapter(
             if (i + 1) % interval == 0:
                 issues = consistency_model.audit_all()
                 if issues:
-                    console.print(f"  [yellow]⚠️ 一致性审计: {len(issues)} 个术语漂移[/yellow]")
+                    console.print(f"  [yellow]⚠️ consistency audit: {len(issues)} term drifts[/yellow]")
                     for iss in issues[:3]:
-                        console.print(f"     {iss['term']}: {iss['consistency']:.0%} → 建议 '{iss['dominant']}'")
+                        console.print(f"     {iss['term']}: {iss['consistency']:.0%} -> suggest '{iss['dominant']}'")
 
             tag = "🔄" if enable_reflection else "✅"
             console.print(f"  [{i+1}/{len(chunks)}] {tag} {chunk.id}")
@@ -289,7 +289,7 @@ def _translate_with_reflection(
         try:
             reflection, usage_r = llm_call(REFLECTION_SYSTEM_PROMPT, reflect_user, tier="cheap")
         except Exception as e:
-            console.print(f"  [yellow]⚠️ Reflection 失败: {e}，跳过修订[/yellow]")
+            console.print(f"  [yellow]⚠️ Reflection failed: {e}, revision skipped[/yellow]")
             break
 
         _merge_usage(total_usage, usage_r)
@@ -301,7 +301,7 @@ def _translate_with_reflection(
 
         # 如果翻译已经很好，跳过修订
         if reflection.strip().startswith("[OK]"):
-            console.print(f"    [dim]Reflection #{round_num+1}: 翻译质量良好，跳过修订[/dim]")
+            console.print(f"    [dim]Reflection #{round_num+1}: quality good, revision skipped[/dim]")
             break
 
         # Step 3: Revision — 根据反馈修订
@@ -315,7 +315,7 @@ def _translate_with_reflection(
         try:
             revised, usage_v = llm_call(revision_system, revision_user, tier="strong")
         except Exception as e:
-            console.print(f"  [yellow]⚠️ Revision 失败: {e}，保留当前版本[/yellow]")
+            console.print(f"  [yellow]⚠️ Revision failed: {e}, keeping current version[/yellow]")
             break
 
         _merge_usage(total_usage, usage_v)
@@ -326,7 +326,7 @@ def _translate_with_reflection(
             _accumulate_cost(config, usage_v)
 
         current = revised
-        console.print(f"    [dim]Reflection #{round_num+1}: 已修订[/dim]")
+        console.print(f"    [dim]Reflection #{round_num+1}: revised[/dim]")
 
     return current, total_usage
 

@@ -26,7 +26,7 @@ PROJECT_ROOT = Path(__file__).parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import load_config, save_config, DEFAULT_CONFIG, calc_cost, MODEL_PRESETS
+from config import load_config, save_config, DEFAULT_CONFIG, MODEL_PRESETS
 from api_client import call_api
 from extractor import extract_book
 from kg_builder import build_knowledge_graph, kg_to_glossary
@@ -103,30 +103,23 @@ def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: in
     prompt_tokens = cost.get("prompt_tokens", 0)
     completion_tokens = cost.get("completion_tokens", 0)
 
-    model = cfg.get("model", "")
-    cost_val, cost_str = calc_cost(model, prompt_tokens, completion_tokens)
-
     elapsed = time.time() - start_time if start_time else 0
     dur_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
 
     console.print()
     console.print("=" * 55)
-    console.print("[bold green]✅ 翻译完成！[/bold green]")
-    console.print(f"  章节: {num_chapters} 章")
-    console.print(f"  分块: {num_chunks} 块")
-    console.print(f"  术语漂移: {num_issues} 个")
+    console.print("[bold green]✅ Translation complete![/bold green]")
+    console.print(f"  Chapters: {num_chapters}")
+    console.print(f"  Chunks: {num_chunks}")
+    console.print(f"  Term drifts: {num_issues}")
     if num_errors > 0:
-        console.print(f"  [red]翻译错误: {num_errors} 块[/red]")
-    console.print(f"  输入 tokens: {prompt_tokens:,}")
-    console.print(f"  输出 tokens: {completion_tokens:,}")
-    if cost_val is not None:
-        console.print(f"  费用: ${cost_val:.4f} (~¥{cost_val * 7.2:.2f})")
-    else:
-        console.print(f"  费用: 自定义模型，费用未知")
-    console.print(f"  用时: {dur_str}")
-    console.print(f"  输出: {output_path}")
+        console.print(f"  [red]Translation errors: {num_errors} chunks[/red]")
+    console.print(f"  Input tokens: {prompt_tokens:,}")
+    console.print(f"  Output tokens: {completion_tokens:,}")
+    console.print(f"  Elapsed: {dur_str}")
+    console.print(f"  Output: {output_path}")
     if num_errors > 0:
-        console.print(f"\n[yellow]💡 重新运行可自动跳过已翻译块，继续翻译剩余 {num_errors} 个失败块[/yellow]")
+        console.print(f"\n[yellow]💡 Re-run to skip completed chunks and retry the remaining {num_errors} failed ones[/yellow]")
     console.print("=" * 55)
 
 

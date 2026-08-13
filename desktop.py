@@ -49,7 +49,6 @@ state = {
     "log_lines": [],
     "progress": 0.0,
     "current_chapter": "",
-    "cost_dollars": None,
     "elapsed_sec": 0,
     "output_path": None,
     "source_preview": "",
@@ -164,7 +163,6 @@ def _build_control_panel():
         state["cancel_btn"].set_visibility(False)
 
         with ui.row().classes("w-full justify-between mt-1"):
-            state["cost_label"] = ui.label("--").classes("text-xs text-emerald-600 font-mono")
             state["time_label"] = ui.label("--").classes("text-xs text-gray-500 font-mono")
 
         state["progress_bar"] = ui.linear_progress(value=0).classes("w-full mt-1")
@@ -303,11 +301,6 @@ def _update_progress_ui():
         if state["elapsed_sec"] > 0:
             m, s = divmod(int(state["elapsed_sec"]), 60)
             state["time_label"].set_text(f"{m}:{s:02d}")
-    if state.get("cost_label"):
-        if state["cost_dollars"] is not None:
-            state["cost_label"].set_text(
-                f"${state['cost_dollars']:.4f}"
-            )
 
 
 async def _start_translation():
@@ -342,7 +335,6 @@ async def _start_translation():
     state["translating"] = True
     state["cancel_flag"] = False
     state["progress"] = 0.0
-    state["cost_dollars"] = None
     state["elapsed_sec"] = 0
     state["log_lines"] = []
     state["output_path"] = None
@@ -444,7 +436,6 @@ def _run_translation_pipeline():
         return
 
     state["output_path"] = result["output_path"]
-    state["cost_dollars"] = result["cost_dollars"]
     state["elapsed_sec"] = result["elapsed_sec"]
 
     # 显示译文预览

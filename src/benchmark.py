@@ -21,7 +21,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from config import load_config, calc_cost, MODEL_PRESETS
+from config import load_config, MODEL_PRESETS
 from chunker import chunk_text, _split_sentences
 from consistency import ConsistencyModel
 from assembler import assemble_translations
@@ -318,27 +318,27 @@ def run_full_benchmark(quick: bool = False):
     }
 
     # ── 4a. 组件基准 ──
-    console.print("\n[bold cyan]── 组件基准测试 ──[/bold cyan]")
+    console.print("\n[bold cyan]── Component benchmark ──[/bold cyan]")
 
     results["components"]["chunker"] = bench_chunker()
     c = results["components"]["chunker"]
-    console.print(f"  Chunker:   {c['sentences_detected']}/{c['expected_sentences']} 句 → {'✓' if c['sentence_accuracy'] else '✗'}")
+    console.print(f"  Chunker:   {c['sentences_detected']}/{c['expected_sentences']} sentences -> {'✓' if c['sentence_accuracy'] else '✗'}")
 
     results["components"]["consistency"] = bench_consistency()
     c = results["components"]["consistency"]
-    console.print(f"  Consistency: {c['drifts_detected']} 漂移检测 → {'✓' if c['entropy_drift_caught'] else '✗'} (entropy) {'✓' if c['quantum_no_false_positive'] else '✗'} (no false+)")
+    console.print(f"  Consistency: {c['drifts_detected']} drift detections -> {'✓' if c['entropy_drift_caught'] else '✗'} (entropy) {'✓' if c['quantum_no_false_positive'] else '✗'} (no false+)")
 
     results["components"]["assembler"] = bench_assembler()
     c = results["components"]["assembler"]
-    console.print(f"  Assembler:  去重 → {'✓' if c['dedup_effective'] else '✗'}")
+    console.print(f"  Assembler:  dedup -> {'✓' if c['dedup_effective'] else '✗'}")
 
     # ── 4b. 翻译质量评估 ──
     if not quick:
-        console.print("\n[bold cyan]── 翻译质量评估 (BLEU + LLM Judge) ──[/bold cyan]")
+        console.print("\n[bold cyan]── Translation quality evaluation (BLEU + LLM Judge) ──[/bold cyan]")
 
         api_key = cfg.get("api_key", "")
         if not api_key:
-            console.print("  [yellow]⚠ 未配置 API Key，跳过翻译评估[/yellow]")
+            console.print("  [yellow]⚠ no API key configured, skipping translation evaluation[/yellow]")
         else:
             total_bleu = 0
             total_chrf = 0
@@ -354,7 +354,7 @@ def run_full_benchmark(quick: bool = False):
                 # 翻译
                 translation, usage = translate_sample(sample["source"], genre)
                 if not translation:
-                    console.print(f"    [red]✗ 翻译失败: {usage.get('error', 'unknown')}[/red]")
+                    console.print(f"    [red]✗ translation failed: {usage.get('error', 'unknown')}[/red]")
                     continue
 
                 # BLEU/chrF
@@ -365,10 +365,8 @@ def run_full_benchmark(quick: bool = False):
                     sample["source"], translation, genre, sample["reference"]
                 )
 
-                # 成本
                 pt = usage.get("prompt_tokens", 0)
                 ct = usage.get("completion_tokens", 0)
-                cost_val, _ = calc_cost(model, pt, ct)
 
                 entry = {
                     "id": sid,
@@ -378,7 +376,6 @@ def run_full_benchmark(quick: bool = False):
                     "chrf": bleu_result.get("chrf"),
                     "judge": judge_result,
                     "tokens": {"prompt": pt, "completion": ct},
-                    "cost_usd": cost_val,
                 }
                 results["translation"].append(entry)
 
@@ -409,13 +406,13 @@ def run_full_benchmark(quick: bool = False):
                     "total_cost_usd": round(total_cost, 4),
                 }
 
-                console.print(f"\n[bold green]── 汇总 ──[/bold green]")
+                console.print(f"\n[bold green]── Summary ──[/bold green]")
                 s = results["summary"]
-                console.print(f"  样本: {s['samples']}")
-                console.print(f"  平均 BLEU: {s['avg_bleu']}")
-                console.print(f"  平均 chrF: {s['avg_chrf']}")
-                console.print(f"  平均 Judge 评分: {s['avg_judge_score']}/10")
-                console.print(f"  总费用: ${s['total_cost_usd']:.4f}")
+                console.print(f"  samples: {s['samples']}")
+                console.print(f"  avg BLEU: {s['avg_bleu']}")
+                console.print(f"  avg chrF: {s['avg_chrf']}")
+                console.print(f"  avg Judge score: {s['avg_judge_score']}/10")
+                
 
     # ── 保存报告 ──
     report_dir = PROJECT_ROOT / "reports" / "benchmark"
@@ -424,7 +421,7 @@ def run_full_benchmark(quick: bool = False):
     with open(report_path, "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
 
-    console.print(f"\n[dim]报告已保存: {report_path}[/dim]")
+    console.print(f"\n[dim]report saved: {report_path}[/dim]")
 
     return results
 

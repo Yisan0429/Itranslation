@@ -69,7 +69,7 @@ def protect(text: str, verbose: bool = True) -> tuple[str, dict]:
             counter += 1
 
     if verbose and placeholders:
-        console.print(f"[cyan]🛡️ 格式保护: {len(placeholders)} 个占位符[/cyan]")
+        console.print(f"[cyan]🛡️ format protection: {len(placeholders)} placeholders[/cyan]")
         # 按类型统计
         by_type = {}
         for key in placeholders:
@@ -112,7 +112,7 @@ def restore(text: str, placeholders: dict, verbose: bool = True) -> str:
 
     if verbose:
         if restored_count == len(placeholders):
-            console.print(f"[green]✅ 格式还原: {restored_count}/{len(placeholders)} 占位符全部恢复[/green]")
+            console.print(f"[green]✅ format restore: {restored_count}/{len(placeholders)} placeholders restored[/green]")
         else:
             console.print(
                 f"[yellow]⚠️ 格式还原: {restored_count}/{len(placeholders)} 恢复成功, "

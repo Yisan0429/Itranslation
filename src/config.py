@@ -108,28 +108,6 @@ DEFAULT_CONFIG = {
     "max_input_file_mb": 100,  # 输入文件最大 MB（超出警告）
     "max_input_file_mb_abort": 500,  # 硬限制，超过拒绝
 
-    # === 定价 ===
-    # 定价表: (input_per_1M, output_per_1M)。自定义模型为 None 时不显示费用
-    "pricing": {
-        # DeepSeek
-        "deepseek-v4-pro":   {"input": 0.435, "output": 0.87},
-        "deepseek-v4-flash": {"input": 0.14,  "output": 0.28},
-        "deepseek/deepseek-chat": {"input": 0.435, "output": 0.87},
-        # OpenAI (GPT-5.5 family)
-        "openai/gpt-5.5":       {"input": 5.00, "output": 15.00},
-        "openai/gpt-5.5-mini":  {"input": 1.50, "output": 6.00},
-        # Anthropic
-        "anthropic/claude-opus-4-8":     {"input": 5.00, "output": 25.00},
-        "anthropic/claude-sonnet-4-6":   {"input": 3.00, "output": 15.00},
-        "anthropic/claude-fable-5":      {"input": 10.00, "output": 50.00},
-        # Google (Gemini 3.5 family)
-        "gemini/gemini-3.5-pro":    {"input": 3.50, "output": 10.50},
-        "gemini/gemini-3.5-flash":  {"input": 0.30, "output": 1.50},
-        # Mimo (MiMo V2.5)
-        "mimo/mimo-v2.5-pro":   {"input": 1.20, "output": 4.80},
-        "mimo/mimo-v2.5-omni":  {"input": 0.40, "output": 1.60},
-    },
-
     # === 高级 ===
     "batch_delimiter": "\n\n␞␞␞\n\n",
     "max_retries": 3,
@@ -154,21 +132,6 @@ def save_config(cfg, path=None):
     save_path = Path(path) if path else (PROJECT_ROOT / "config.json")
     with open(save_path, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
-
-
-def calc_cost(model: str, prompt_tokens: int, completion_tokens: int, pricing: dict = None) -> tuple[float | None, str]:
-    """计算翻译成本。返回 (美元金额, 显示字符串)。
-
-    自定义模型（无定价）返回 (None, 提示信息)。
-    """
-    if pricing is None:
-        pricing = DEFAULT_CONFIG["pricing"]
-    rate = pricing.get(model)
-    if rate is None:
-        return None, f"{prompt_tokens:,}+{completion_tokens:,} tokens (自定义模型，费用未知)"
-    cost = prompt_tokens / 1_000_000 * rate["input"] + completion_tokens / 1_000_000 * rate["output"]
-    return cost, f"{prompt_tokens:,}+{completion_tokens:,} tokens ·  (~¥{cost * 7.2:.2f})"
-
 
 # 常用模型预设（GUI 下拉列表用）
 # provider_label: GUI 下拉显示的平台名

@@ -145,31 +145,31 @@ def generate_consistency_report(
     """生成一致性审计报告。"""
     lines = [
         "=" * 60,
-        "术语翻译一致性审计报告",
+        "Terminology Translation Consistency Audit Report",
         "=" * 60,
         "",
-        f"共扫描 {len(glossary)} 个术语",
-        f"发现 {len(issues)} 个一致性漂移问题（阈值 <80%）",
+        f"scanned {len(glossary)} terms",
+        f"found {len(issues)} consistency drift issues (threshold <80%)",
         "",
     ]
 
     if issues:
-        lines.append("--- 问题术语 ---")
+        lines.append("--- Drifted terms ---")
         for issue in issues:
             lines.append(f"\n  📛 {issue['term']}")
-            lines.append(f"     一致性: {issue['consistency']:.0%}")
-            lines.append(f"     译法分布:")
+            lines.append(f"     consistency: {issue['consistency']:.0%}")
+            lines.append(f"     translation distribution:")
             for zh, count in issue["translations"].items():
-                marker = " ✅ 主" if zh == issue["dominant"] else " ⚠️"
-                lines.append(f"       {zh}: {count} 次{marker}")
-            lines.append(f"     建议: 统一使用 '{issue['dominant']}'")
-            lines.append(f"     共出现 {issue['total_occurrences']} 次")
+                marker = " ✅ dominant" if zh == issue["dominant"] else " ⚠️"
+                lines.append(f"       {zh}: {count}x{marker}")
+            lines.append(f"     suggest: unify on '{issue['dominant']}'")
+            lines.append(f"     total occurrences: {issue['total_occurrences']}")
 
     report = "\n".join(lines)
 
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(report)
-        console.print(f"[green]📋 一致性报告已保存到 {output_path}[/green]")
+        console.print(f"[green]📋 Consistency report saved to {output_path}[/green]")
 
     return report

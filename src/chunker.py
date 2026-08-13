@@ -70,7 +70,7 @@ def chunk_text(
     if not sentences:
         return []
 
-    console.print(f"[cyan]✂️ 分块: {len(sentences)} 句 → 目标 {target_tokens} tokens/块，重叠 {overlap_sentences} 句[/cyan]")
+    console.print(f"[cyan]✂️ Chunking: {len(sentences)} sentences -> target {target_tokens} tokens/chunk, overlap {overlap_sentences}[/cyan]")
 
     # Step 2: 计算每句 token 数
     sent_tokens = [(s, _estimate_tokens(s)) for s in sentences]
@@ -81,7 +81,7 @@ def chunk_text(
     # Step 4: 加重叠
     chunks = _add_overlap(raw_chunks, sent_tokens, overlap_sentences)
 
-    console.print(f"[green]✅ 分块完成: {len(chunks)} 块[/green]")
+    console.print(f"[green]✅ Chunking done: {len(chunks)} chunks[/green]")
     return chunks
 
 

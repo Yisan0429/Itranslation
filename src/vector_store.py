@@ -36,8 +36,8 @@ def _ensure_sentence_transformer():
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError:
-        console.print("[yellow]⚠️ sentence-transformers 未安装[/yellow]")
-        console.print("  安装: uv sync --extra rat")
+        console.print("[yellow]⚠️ sentence-transformers not installed[/yellow]")
+        console.print("  Install: uv sync --extra rat")
         return False
 
     import os
@@ -49,10 +49,10 @@ def _ensure_sentence_transformer():
         model_path = str(model_dir.resolve())
         try:
             _ = SentenceTransformer(model_path)
-            console.print("[cyan]📚 sentence-transformers 模型已就绪 (本地路径)[/cyan]")
+            console.print("[cyan]📚 sentence-transformers model ready (local path)[/cyan]")
             return True
         except Exception as e:
-            console.print(f"[yellow]⚠️ 本地模型加载失败: {e}[/yellow]")
+            console.print(f"[yellow]⚠️ failed to load local model: {e}[/yellow]")
 
     # 尝试在线加载（可能触发下载）
     try:
@@ -61,10 +61,10 @@ def _ensure_sentence_transformer():
     except Exception as e:
         err_msg = str(e)[:200]
         if "connect" in err_msg.lower() or "ssl" in err_msg.lower() or "entry" in err_msg.lower():
-            console.print("[yellow]⚠️ 无法连接到 HuggingFace 下载模型[/yellow]")
+            console.print("[yellow]⚠️ cannot reach HuggingFace to download the model[/yellow]")
             console.print(_HF_MIRROR_HELP)
             return False
-        console.print(f"[yellow]⚠️ 加载 sentence-transformers 模型失败: {err_msg[:100]}[/yellow]")
+        console.print(f"[yellow]⚠️ failed to load sentence-transformers model: {err_msg[:100]}[/yellow]")
         return False
 
 
@@ -106,7 +106,7 @@ class TranslationVectorStore:
 
             # 确保模型已下载
             if not _ensure_sentence_transformer():
-                console.print("[yellow]⚠️ RAT 功能不可用（模型缺失），翻译将继续但无检索增强[/yellow]")
+                console.print("[yellow]⚠️ RAT unavailable (model missing); translation continues without retrieval augmentation[/yellow]")
                 return
 
             self.persist_dir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +120,7 @@ class TranslationVectorStore:
             model_dir = MODEL_CACHE_DIR / "hub" / "models--sentence-transformers--all-MiniLM-L6-v2" / "snapshots" / "main"
             if model_dir.exists() and (model_dir / "model.safetensors").exists():
                 model_path = str(model_dir.resolve())
-                console.print(f"[cyan]📚 使用本地模型: {model_path}[/cyan]")
+                console.print(f"[cyan]📚 using local model: {model_path}[/cyan]")
             else:
                 model_path = "all-MiniLM-L6-v2"
             self.ef = embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -135,11 +135,11 @@ class TranslationVectorStore:
 
             self._initialized = True
             count = self.collection.count()
-            console.print(f"[cyan]📚 向量存储已初始化 ({count} 条已有记录)[/cyan]")
+            console.print(f"[cyan]📚 vector store initialized ({count} existing records)[/cyan]")
 
         except ImportError:
-            console.print("[yellow]⚠️ chromadb 未安装，RAT 检索功能禁用[/yellow]")
-            console.print("  安装: uv sync --extra rat")
+            console.print("[yellow]⚠️ chromadb not installed, RAT retrieval disabled[/yellow]")
+            console.print("  Install: uv sync --extra rat")
             self._initialized = False
 
     def add_translation(
@@ -165,7 +165,7 @@ class TranslationVectorStore:
                 ids=[para_id],
             )
         except Exception as e:
-            console.print(f"[yellow]⚠️ 存储翻译记录失败 ({para_id}): {e}[/yellow]")
+            console.print(f"[yellow]⚠️ failed to store translation record ({para_id}): {e}[/yellow]")
 
     def retrieve_relevant(self, query_text: str, n_results: int = 5) -> list[dict]:
         """
@@ -200,7 +200,7 @@ class TranslationVectorStore:
             return retrieved
 
         except Exception as e:
-            console.print(f"[yellow]⚠️ 检索失败: {e}[/yellow]")
+            console.print(f"[yellow]⚠️ retrieval failed: {e}[/yellow]")
             return []
 
     def retrieve_by_terms(self, terms: list[str], n_results: int = 3) -> list[dict]:
@@ -227,6 +227,6 @@ class TranslationVectorStore:
                 embedding_function=self.ef,
                 metadata={"hnsw:space": "cosine"},
             )
-            console.print("[yellow]🗑️ 向量存储已清空[/yellow]")
+            console.print("[yellow]🗑️ vector store cleared[/yellow]")
         except Exception as e:
-            console.print(f"[red]清空失败: {e}[/red]")
+            console.print(f"[red]clear failed: {e}[/red]")

@@ -92,12 +92,12 @@ def build_knowledge_graph(
     Returns:
         知识图谱 dict
     """
-    console.print("[bold cyan]🧠 Phase 0: Agentic Pre-Read — 构建知识图谱...[/bold cyan]")
+    console.print("[bold cyan]🧠 Phase 0: Agentic Pre-Read — building knowledge graph...[/bold cyan]")
 
     # 采样：从全书均匀采样
     sample = _sample_text(full_text, sample_ratio, max_sample_tokens)
     sample_tokens = _estimate_tokens(sample)
-    console.print(f"  采样 {sample_tokens} tokens ({len(sample)} 字符)")
+    console.print(f"  sampled {sample_tokens} tokens ({len(sample)} chars)")
 
     # 调用 LLM 构建 KG
     system_prompt = "You are an expert literary analyst. Return ONLY valid JSON."
@@ -105,15 +105,15 @@ def build_knowledge_graph(
     try:
         response, _ = llm_call(system_prompt, KG_BUILD_PROMPT + "\n\nTEXT EXCERPTS:\n" + sample)
         kg = _parse_kg_response(response)
-        console.print(f"[green]✅ 知识图谱构建完成[/green]")
-        console.print(f"  体裁: {kg.get('book_metadata', {}).get('genre', 'unknown')}")
-        console.print(f"  术语簇: {len(kg.get('terminology_clusters', []))} 个")
-        console.print(f"  人物/实体: {len(kg.get('characters_or_key_figures', []))} 个")
+        console.print(f"[green]✅ knowledge graph built[/green]")
+        console.print(f"  genre: {kg.get('book_metadata', {}).get('genre', 'unknown')}")
+        console.print(f"  terminology clusters: {len(kg.get('terminology_clusters', []))}")
+        console.print(f"  characters/entities: {len(kg.get('characters_or_key_figures', []))}")
         return kg
 
     except Exception as e:
-        console.print(f"[red]❌ KG 构建失败: {e}[/red]")
-        console.print("[yellow]使用空 KG 继续翻译[/yellow]")
+        console.print(f"[red]❌ KG build failed: {e}[/red]")
+        console.print("[yellow]continuing with empty KG[/yellow]")
         return _empty_kg()
 
 

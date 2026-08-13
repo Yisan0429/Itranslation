@@ -49,19 +49,19 @@ def _extract_with_marker(pdf_path: Path) -> str:
         # marker 用 datalab 管理模型缓存，需单独指定路径
         os.environ.setdefault("DATALAB_DIR", str(cache_dir / "datalab"))
 
-        console.print("[bold cyan]📄 marker 视觉提取 PDF（加载模型...）[/bold cyan]")
+        console.print("[bold cyan]📄 marker visual PDF extraction (loading model...)[/bold cyan]")
         artifacts = create_model_dict()
         converter = PdfConverter(artifact_dict=artifacts)
         rendered = converter(str(pdf_path))
-        console.print("[green]✅ marker 提取完成[/green]")
+        console.print("[green]✅ marker extraction done[/green]")
         return rendered
 
     except ImportError:
         raise
     except Exception as e:
         msg = str(e)[:200]
-        console.print(f"[red]❌ marker 失败: {msg}[/red]")
-        console.print("[yellow]→ 回退到 PyMuPDF 文本提取[/yellow]")
+        console.print(f"[red]❌ marker failed: {msg}[/red]")
+        console.print("[yellow]→ falling back to PyMuPDF text extraction[/yellow]")
         return _extract_with_fitz(pdf_path)
 
 
@@ -71,15 +71,15 @@ def _extract_with_fitz(pdf_path: Path, use_markdown: bool = True) -> str:
         if use_markdown:
             try:
                 import pymupdf4llm
-                console.print("[cyan]📄 使用 PyMuPDF4LLM 提取（Markdown 模式）[/cyan]")
+                console.print("[cyan]📄 extracting with PyMuPDF4LLM (markdown mode)[/cyan]")
                 md = pymupdf4llm.to_markdown(str(pdf_path))
-                console.print("[green]✅ PyMuPDF4LLM 提取完成[/green]")
+                console.print("[green]✅ PyMuPDF4LLM extraction done[/green]")
                 return md
             except ImportError:
                 pass
 
         import fitz
-        console.print("[cyan]📄 使用 PyMuPDF 逐页提取（文本模式）[/cyan]")
+        console.print("[cyan]📄 extracting with PyMuPDF page by page (text mode)[/cyan]")
 
         doc = fitz.open(str(pdf_path))
         all_lines = []
@@ -94,7 +94,7 @@ def _extract_with_fitz(pdf_path: Path, use_markdown: bool = True) -> str:
 
         # 重新连接被 PDF 断开的段落
         text = _join_broken_lines(all_lines)
-        console.print(f"[green]✅ PyMuPDF 提取完成 ({page_count} 页)[/green]")
+        console.print(f"[green]✅ PyMuPDF extraction done ({page_count} pages)[/green]")
         return text
 
     except ImportError:
@@ -133,7 +133,7 @@ def extract_epub(epub_path: str) -> str:
         from ebooklib import epub
         from bs4 import BeautifulSoup
 
-        console.print("[cyan]📖 解析 EPUB...[/cyan]")
+        console.print("[cyan]📖 parsing EPUB...[/cyan]")
         book = epub.read_epub(epub_path)
         chapters = []
 
@@ -151,7 +151,7 @@ def extract_epub(epub_path: str) -> str:
             if paragraphs:
                 chapters.append("\n\n".join(paragraphs))
 
-        console.print(f"[green]✅ EPUB 提取完成 ({len(chapters)} 章)[/green]")
+        console.print(f"[green]✅ EPUB extraction done ({len(chapters)} chapters)[/green]")
         return "\n\n".join(chapters)
 
     except ImportError:
@@ -160,7 +160,7 @@ def extract_epub(epub_path: str) -> str:
 
 def extract_text(txt_path: str) -> str:
     """读取纯文本文件（自动检测编码）。"""
-    console.print("[cyan]📝 读取文本文件...[/cyan]")
+    console.print("[cyan]📝 Reading text file...[/cyan]")
 
     # 尝试常见编码，优先 UTF-8
     for encoding in ("utf-8", "utf-8-sig", "gbk", "gb2312", "gb18030", "latin-1"):
@@ -168,14 +168,14 @@ def extract_text(txt_path: str) -> str:
             with open(txt_path, "r", encoding=encoding) as f:
                 text = f.read()
             if encoding != "utf-8":
-                console.print(f"[dim]  检测到编码: {encoding}[/dim]")
+                console.print(f"[dim]  detected encoding: {encoding}[/dim]")
             break
         except (UnicodeDecodeError, UnicodeError):
             continue
     else:
         raise ValueError(f"无法识别文件编码: {txt_path}。请将文件转为 UTF-8 编码。")
 
-    console.print(f"[green]✅ 文本读取完成 ({len(text)} 字符)[/green]")
+    console.print(f"[green]✅ text read complete ({len(text)} chars)[/green]")
     return text
 
 
@@ -199,7 +199,7 @@ def extract_book(book_path: str, use_vision: bool = True, max_mb: int = 100, max
             f"请拆分文件或使用更小的输入。"
         )
     if size_mb > max_mb:
-        console.print(f"[yellow]⚠️ 文件较大 ({size_mb:.1f} MB)，处理可能需要较长时间[/yellow]")
+        console.print(f"[yellow]⚠️ large file ({size_mb:.1f} MB), processing may take a while[/yellow]")
 
     if suffix == ".pdf":
         return extract_pdf(book_path, use_vision=use_vision)

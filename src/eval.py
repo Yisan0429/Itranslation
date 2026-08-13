@@ -17,7 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()  # src/ → project root
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from config import load_config, calc_cost
+from config import load_config
 from chunker import chunk_text, _split_sentences
 from consistency import ConsistencyModel
 from assembler import assemble_translations
@@ -46,13 +46,13 @@ PHILOSOPHY_SAMPLE = """Consciousness presents the most formidable challenge to c
 
 def eval_chunker():
     print("=" * 55)
-    print("1. Chunker — 句子拆分与重叠")
+    print("1. Chunker — sentence splitting and overlap")
     print("=" * 55)
 
     # 1a: 句子拆分
     sentences = _split_sentences(SAMPLE_TEXT)
     real_sentences = [s for s in sentences if s not in ("§", "¶")]
-    print(f"\n  句子拆分: {len(sentences)} 标记 → {len(real_sentences)} 实际句子")
+    print(f"\n  sentence split: {len(sentences)} markers -> {len(real_sentences)} sentences")
 
     # 检查是否有明显错误的拆分
     issues = []
@@ -64,19 +64,19 @@ def eval_chunker():
             # 可能在引用中间切了 — 检查下一句是否闭合
             pass  # 此处仅标记，可根据实际需要细化
 
-    print(f"  拆分质量: {'✓ 正常' if not issues else '⚠ 存在问题'}")
+    print(f"  split quality: {'✓ OK' if not issues else '⚠ has issues'}")
     for iss in issues[:5]:
         print(iss)
 
     # 1b: 分块与重叠
     chunks = chunk_text(SAMPLE_TEXT, target_tokens=100, max_tokens=300, overlap_sentences=2)
-    print(f"\n  分块结果: {len(chunks)} 块 (target=100 tokens, overlap=2)")
+    print(f"\n  chunking result: {len(chunks)} chunks (target=100 tokens, overlap=2)")
 
     if len(chunks) >= 2:
         c0_last = chunks[0].text.split()[-10:]
         c1_first = chunks[1].text.split()[:10]
         overlap_words = set(c0_last) & set(c1_first)
-        print(f"  重叠检测: {len(overlap_words)} 共同词 → {'✓ 重叠生效' if overlap_words else '✗ 无重叠 — 可能异常'}")
+        print(f"  overlap check: {len(overlap_words)} shared words -> {'✓ overlap effective' if overlap_words else '✗ no overlap — possible anomaly'}")
 
     # 检查是否有相邻块的 start > end (gap)
     gaps = []
@@ -89,7 +89,7 @@ def eval_chunker():
     if gaps:
         for g in gaps[:3]: print(g)
     else:
-        print("  块间连续: ✓ 无间隙")
+        print("  chunk continuity: ✓ no gaps")
 
     return {"sentences": len(real_sentences), "chunks": len(chunks), "overlap_ok": bool(overlap_words)}
 
@@ -100,7 +100,7 @@ def eval_chunker():
 
 def eval_consistency():
     print("\n" + "=" * 55)
-    print("2. ConsistencyModel — 术语追踪与漂移检测")
+    print("2. ConsistencyModel — term tracking and drift detection")
     print("=" * 55)
 
     cm = ConsistencyModel()
@@ -127,21 +127,21 @@ def eval_consistency():
     issues = cm.audit_all(min_occurrences=3)
     glossary = cm.get_glossary_snapshot()
 
-    print(f"\n  记录: {len(records)} 条 — {len(glossary)} 个术语")
-    print(f"  漂移检测: {len(issues)} 个问题 (阈值 <80%)")
+    print(f"\n  records: {len(records)} — {len(glossary)} terms")
+    print(f"  drift detection: {len(issues)} issues (threshold <80%)")
 
     for iss in issues:
         print(f"\n    📛 {iss['term']}")
-        print(f"       一致性: {iss['consistency']:.0%}")
-        print(f"       分布: {iss['translations']}")
-        print(f"       建议: '{iss['dominant']}'")
+        print(f"       consistency: {iss['consistency']:.0%}")
+        print(f"       distribution: {iss['translations']}")
+        print(f"       suggest: '{iss['dominant']}'")
 
     # 验证: consciousness 应该有漂移 (2/3 = 67%)
     cons = [i for i in issues if i['term'] == 'consciousness']
     if cons:
-        print(f"\n  ✓ consciousness 漂移被正确检测 (一致性 {cons[0]['consistency']:.0%})")
+        print(f"\n  ✓ consciousness drift detected correctly (consistency {cons[0]['consistency']:.0%})")
     else:
-        print("\n  ✗ consciousness 漂移未被检测")
+        print("\n  ✗ consciousness drift not detected")
 
     return {"terms": len(glossary), "drifts": len(issues), "correct_detection": bool(cons)}
 
@@ -152,23 +152,23 @@ def eval_consistency():
 
 def eval_vector_store():
     print("\n" + "=" * 55)
-    print("3. VectorStore (RAT) — 检索相关性")
+    print("3. VectorStore (RAT) — retrieval relevance")
     print("=" * 55)
 
     try:
         from vector_store import TranslationVectorStore
     except ImportError:
-        print("  ⚠ chromadb/sentence-transformers 未安装, 跳过")
+        print("  ⚠ chromadb/sentence-transformers not installed, skipping")
         return {"available": False}
 
     vs = TranslationVectorStore(persist_dir=str(PROJECT_ROOT / "vector_store"))
     vs.initialize()
 
     if not vs._initialized:
-        print("  ⚠ 模型未就绪, 跳过")
+        print("  ⚠ model not ready, skipping")
         return {"available": False}
 
-    print(f"  ✓ 已初始化 ({vs.count()} 条已有记录)")
+    print(f"  ✓ initialized ({vs.count()} existing records)")
 
     # 插入测试数据
     test_data = [
@@ -187,17 +187,17 @@ def eval_vector_store():
         ("the problem of subjective experience", ["consciousness_1"]),
     ]
 
-    print(f"\n  插入: {len(test_data)} 条")
+    print(f"\n  inserted: {len(test_data)} records")
     hits = 0
     for query, expected_ids in queries:
         results = vs.retrieve_relevant(query, n_results=3)
         matched = [r['para_id'] for r in results]
         relevant = len(set(matched) & set(expected_ids))
         hits += 1 if relevant > 0 else 0
-        print(f"  查询 '{query[:40]}...' → {matched} (期望: {expected_ids}) → {'✓' if relevant > 0 else '✗'}")
+        print(f"  query '{query[:40]}...' -> {matched} (expected: {expected_ids}) -> {'✓' if relevant > 0 else '✗'}")
 
     recall = hits / len(queries) if queries else 0
-    print(f"\n  检索命中率: {hits}/{len(queries)} ({recall:.0%})")
+    print(f"\n  retrieval hit rate: {hits}/{len(queries)} ({recall:.0%})")
 
     return {"available": True, "count": vs.count(), "recall": recall}
 
@@ -208,12 +208,12 @@ def eval_vector_store():
 
 def eval_kg_builder():
     print("\n" + "=" * 55)
-    print("4. KG Builder — 体裁检测与术语提取")
+    print("4. KG Builder — genre detection and term extraction")
     print("=" * 55)
 
     api_key = cfg.get("api_key", "")
     if not api_key:
-        print("  ⚠ 未配置 API Key, 跳过在线评估")
+        print("  ⚠ no API key configured, skipping online evaluation")
         return {"available": False}
 
     from api_client import call_api
@@ -232,7 +232,7 @@ def eval_kg_builder():
         )
 
     try:
-        print("  发送预读请求到 DeepSeek...")
+        print("  sending pre-read request to DeepSeek...")
         start = time.time()
         kg = build_knowledge_graph(PHILOSOPHY_SAMPLE, llm_call,
                                      sample_ratio=0.5, max_sample_tokens=2000)
@@ -243,21 +243,21 @@ def eval_kg_builder():
         terms = kg_to_glossary(kg)
         num_terms = len(terms)
 
-        print(f"  体裁检测: {genre} (期望: philosophy)")
-        print(f"  语言风格: {style}")
-        print(f"  术语提取: {num_terms} 个")
+        print(f"  genre detection: {genre} (expected: philosophy)")
+        print(f"  language style: {style}")
+        print(f"  terms extracted: {num_terms}")
         if terms:
-            print(f"  术语示例: {list(terms.keys())[:5]}")
-        print(f"  耗时: {elapsed:.1f}s")
+            print(f"  term examples: {list(terms.keys())[:5]}")
+        print(f"  elapsed: {elapsed:.1f}s")
 
         genre_ok = genre == "philosophy"
-        print(f"  体裁准确性: {'✓' if genre_ok else '⚠ 期望 philosophy'}")
+        print(f"  genre accuracy: {'✓' if genre_ok else '⚠ expected philosophy'}")
 
         return {"available": True, "genre": genre, "genre_ok": genre_ok,
                 "terms": num_terms, "elapsed": elapsed}
 
     except Exception as e:
-        print(f"  ✗ 失败: {e}")
+        print(f"  ✗ failed: {e}")
         return {"available": False, "error": str(e)}
 
 
@@ -267,12 +267,12 @@ def eval_kg_builder():
 
 def eval_e2e():
     print("\n" + "=" * 55)
-    print("5. End-to-End — 翻译流程验证")
+    print("5. End-to-End — translation pipeline validation")
     print("=" * 55)
 
     api_key = cfg.get("api_key", "")
     if not api_key:
-        print("  ⚠ 未配置 API Key, 跳过")
+        print("  ⚠ no API key configured, skipping")
         return {"available": False}
 
     from api_client import call_api
@@ -298,8 +298,8 @@ def eval_e2e():
 
     cm = ConsistencyModel()
 
-    print(f"  输入: {len(text)} 字符 → {len(chunks)} 块")
-    print(f"  翻译中...")
+    print(f"  input: {len(text)} chars -> {len(chunks)} chunks")
+    print(f"  translating...")
 
     start = time.time()
     try:
@@ -315,33 +315,23 @@ def eval_e2e():
         if len(full) < len(text) * 0.3:
             issues.append(f"译文过短 ({len(full)} vs {len(text)} 原文)")
 
-        # 成本（使用统一的 calc_cost）
-        cost = cfg.get("_cost", {})
-        pt = cost.get("prompt_tokens", 0)
-        ct = cost.get("completion_tokens", 0)
-        cost_val, cost_str = calc_cost(cfg.get("model", ""), pt, ct)
-
-        print(f"  输出: {len(full)} 字符")
-        print(f"  块数: {len(trans)}")
-        print(f"  Token: {pt:,}入 + {ct:,}出")
-        if cost_val is not None:
-            print(f"  费用: ${cost_val:.4f} (~¥{cost_val * 7.2:.2f})")
-        else:
-            print(f"  费用: 自定义模型，费用未知")
-        print(f"  耗时: {elapsed:.1f}s")
-        print(f"  输出预览: {full[:150]}...")
+        print(f"  output: {len(full)} chars")
+        print(f"  chunks: {len(trans)}")
+        print(f"  Tokens: {pt:,} in + {ct:,} out")
+        print(f"  elapsed: {elapsed:.1f}s")
+        print(f"  output preview: {full[:150]}...")
 
         if issues:
             for iss in issues:
                 print(f"  ⚠ {iss}")
         else:
-            print(f"  ✓ 基本验证通过")
+            print(f"  ✓ basic validation passed")
 
         return {"available": True, "chunks": len(chunks), "output_len": len(full),
                 "elapsed": elapsed, "tokens_in": pt, "tokens_out": ct}
 
     except Exception as e:
-        print(f"  ✗ 失败: {e}")
+        print(f"  ✗ failed: {e}")
         return {"available": False, "error": str(e)}
 
 
@@ -351,8 +341,8 @@ def eval_e2e():
 
 def main():
     print("=" * 55)
-    print("  Itranslation — 组件评估报告")
-    print(f"  模型: {cfg.get('model', '?')}")
+    print("  Itranslation — component evaluation report")
+    print(f"  model: {cfg.get('model', '?')}")
     print("=" * 55)
 
     results = {}
@@ -365,7 +355,7 @@ def main():
 
     # 汇总
     print("\n" + "=" * 55)
-    print("  评估汇总")
+    print("  evaluation summary")
     print("=" * 55)
 
     checks = [
@@ -382,13 +372,13 @@ def main():
         print(f"  {'✓' if passed else '✗'}  {name}")
 
     score = sum(1 for _, p in checks if p)
-    print(f"\n  通过: {score}/{len(checks)}")
+    print(f"\n  passed: {score}/{len(checks)}")
     if score == len(checks):
-        print("  🎉 全部通过!")
+        print("  🎉 all passed!")
     elif score >= len(checks) - 1:
-        print("  ⚠ 基本通过, 有 1 项待修复")
+        print("  ⚠ mostly passed, 1 item to fix")
     else:
-        print("  ❌ 存在多项问题, 需排查")
+        print("  ❌ multiple issues found, investigation needed")
 
     # 保存报告
     report_path = PROJECT_ROOT / "reports" / "eval" / "eval_report.json"
@@ -397,7 +387,7 @@ def main():
         json.dump({k: {kk: vv for kk, vv in v.items() if not isinstance(vv, (list, dict))}
                    for k, v in results.items()},
                   f, ensure_ascii=False, indent=2)
-    print(f"\n  报告已保存: {report_path}")
+    print(f"\n  report saved: {report_path}")
 
 
 if __name__ == "__main__":

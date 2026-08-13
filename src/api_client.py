@@ -147,7 +147,7 @@ def _call_via_http(
 
         if attempt < max_retries - 1:
             delay = min(retry_base_delay * (2 ** attempt), retry_max_delay)
-            console.print(f"  [yellow]⚠️ 第{attempt+1}次失败: {last_error}，{delay:.0f}s 后重试[/yellow]")
+            console.print(f"  [yellow]⚠️ attempt {attempt+1} failed: {last_error}, retrying in {delay:.0f}s[/yellow]")
             time.sleep(delay)
 
     raise last_error

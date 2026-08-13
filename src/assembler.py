@@ -54,7 +54,7 @@ def assemble_translations(
     elif strategy == "body_join":
         return _assemble_body_join(chunks, translations)
     else:
-        console.print(f"  [yellow]⚠️ 未知组装策略 '{strategy}'，回退 body_join[/yellow]")
+        console.print(f"  [yellow]⚠️ unknown assembly strategy '{strategy}', falling back to body_join[/yellow]")
         return _assemble_body_join(chunks, translations)
 
 
@@ -80,13 +80,13 @@ def _assemble_first_lock(chunks: list, translations: list[str]) -> str:
             skip = len(sentences) - body_count
             sentences = sentences[skip:]
             console.print(
-                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 译文含 {skip} 句重叠上下文"
-                f"（旧 prompt 产物），已跳过[/yellow]"
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: translation contains {skip} context-overlap sentences"
+                f" (legacy prompt output), skipped[/yellow]"
             )
         elif len(sentences) < body_count:
             console.print(
-                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 期望 {body_count} 句, 实际 {len(sentences)}"
-                f" — LLM 可能合并/遗漏了句子[/yellow]"
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: expected {body_count} sentences, got {len(sentences)}"
+                f" — LLM may have merged or dropped sentences[/yellow]"
             )
         # 按 chunk 顺序处理（保证"第一次出现"的语义）
         for offset, zh_sentence in enumerate(sentences):
@@ -116,13 +116,13 @@ def _assemble_body_join(chunks: list, translations: list[str]) -> str:
             skip = len(sentences) - body_count
             sentences = sentences[skip:]
             console.print(
-                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 译文含 {skip} 句重叠上下文"
-                f"（旧 prompt 产物），已跳过[/yellow]"
+                f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: translation contains {skip} context-overlap sentences"
+                f" (legacy prompt output), skipped[/yellow]"
             )
         elif len(sentences) < body_count:
             console.print(
                 f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: 期望 {body_count} 句, 实际 {len(sentences)}"
-                f" — 句序可能错位[/yellow]"
+                f" — sentence order may be misaligned[/yellow]"
             )
         out.extend(sentences)
 
@@ -161,8 +161,8 @@ def _split_by_separator(text: str, expected_count: int = None) -> list[str]:
     # 验证：如果期望句子数和实际差距过大，记录警告
     if expected_count and len(parts) != expected_count:
         console.print(
-            f"  [yellow]⚠️ 句子数不匹配: 期望 {expected_count}, 实际 {len(parts)}"
-            f" — LLM 可能未遵循 ␟ 分隔指令[/yellow]"
+            f"  [yellow]⚠️ sentence count mismatch: expected {expected_count}, got {len(parts)}"
+            f" — LLM may not have followed the ␟ separator instruction[/yellow]"
         )
 
     return parts
@@ -196,7 +196,7 @@ def assemble_book(
     else:
         _write_txt(chapter_translations, str(path), bilingual)
 
-    console.print(f"[green]✅ 最终译文已保存到 {path}[/green]")
+    console.print(f"[green]✅ Final translation saved to {path}[/green]")
 
 
 def _write_txt(chapters, path, bilingual):
@@ -224,7 +224,7 @@ def _write_epub(chapters, path):
     try:
         from ebooklib import epub
     except ImportError:
-        console.print("[yellow]⚠️ ebooklib 未安装，回退到 TXT[/yellow]")
+        console.print("[yellow]⚠️ ebooklib not installed, falling back to TXT[/yellow]")
         _write_txt(chapters, path.replace(".epub", ".txt"), False)
         return
 
@@ -260,7 +260,7 @@ def _write_epub(chapters, path):
     book.add_item(epub.EpubNav())
 
     epub.write_epub(path, book)
-    console.print(f"[green]✅ EPUB 已保存到 {path}[/green]")
+    console.print(f"[green]✅ EPUB saved to {path}[/green]")
 
 
 def _find_cjk_font() -> tuple[str, str] | None:
@@ -308,7 +308,7 @@ def _write_pdf(chapters, path):
     try:
         from fpdf import FPDF
     except ImportError:
-        console.print("[yellow]⚠️ fpdf2 未安装，回退到 TXT[/yellow]")
+        console.print("[yellow]⚠️ fpdf2 not installed, falling back to TXT[/yellow]")
         _write_txt(chapters, path.replace(".pdf", ".txt"), False)
         return
 
@@ -324,12 +324,12 @@ def _write_pdf(chapters, path):
             pdf.add_font("zh", "B", fp, uni=True)
             font_ok = True
             font_family = name
-            console.print(f"[cyan]📄 PDF 使用字体: {font_family} ({fp})[/cyan]")
+            console.print(f"[cyan]📄 PDF font: {font_family} ({fp})[/cyan]")
         except Exception:
             pass
 
     if not font_ok:
-        console.print("[yellow]⚠️ 未找到 CJK 中文字体，PDF 可能无法正确显示中文[/yellow]")
+        console.print("[yellow]⚠️ CJK font not found, PDF may not render Chinese correctly[/yellow]")
 
     pdf.set_auto_page_break(auto=True, margin=15)
     for title, text in chapters:
@@ -352,4 +352,4 @@ def _write_pdf(chapters, path):
                 pdf.ln(2)
 
     pdf.output(path)
-    console.print(f"[green]✅ PDF 已保存到 {path} ({font_ok and '中文' or '英文'}字体)[/green]")
+    console.print(f"[green]✅ PDF saved to {path} ({font_ok and 'CJK' or 'Latin'} font)[/green]")
