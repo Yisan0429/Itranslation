@@ -109,14 +109,28 @@ DEFAULT_CONFIG = {
 }
 
 
+_PATH_KEYS = ("output_dir", "reports_dir", "cache_dir", "vector_store_dir")
+
+
 def load_config(custom_path=None):
-    """加载配置：默认值 < config.json（如果存在）"""
+    """加载配置：默认值 < config.json（如果存在）。
+
+    路径类键：空值回退运行时默认（按当前执行环境解析 PROJECT_ROOT，
+    避免 config.json 里写死的 Windows UNC 路径在 WSL/Linux 下失效）；
+    相对路径相对 PROJECT_ROOT 解析；绝对路径原样使用。
+    """
     cfg = DEFAULT_CONFIG.copy()
     config_path = Path(custom_path) if custom_path else (PROJECT_ROOT / "config.json")
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as f:
             user_cfg = json.load(f)
             cfg.update(user_cfg)
+    for k in _PATH_KEYS:
+        v = cfg.get(k)
+        if not v:
+            cfg[k] = DEFAULT_CONFIG[k]
+        elif not Path(v).is_absolute():
+            cfg[k] = str(PROJECT_ROOT / v)
     return cfg
 
 

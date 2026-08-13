@@ -314,7 +314,7 @@ def parse_structure(markdown_text: str) -> list[dict]:
         else:
             # 没有章节标题的内容 → 放入默认章
             if not current_chapter:
-                current_chapter = {"title": "正文", "paragraphs": []}
+                current_chapter = {"title": "Body", "paragraphs": []}
             current_chapter["paragraphs"].append(stripped)
 
     if current_chapter and current_chapter.get("paragraphs"):

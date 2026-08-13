@@ -165,7 +165,9 @@ def _build_control_panel():
         with ui.row().classes("w-full justify-between mt-1"):
             state["time_label"] = ui.label("--").classes("text-xs text-gray-500 font-mono")
 
-        state["progress_bar"] = ui.linear_progress(value=0).classes("w-full mt-1")
+        with ui.row().classes("w-full items-center gap-2 mt-1"):
+            state["progress_bar"] = ui.linear_progress(value=0).props("size=8px").classes("flex-1")
+            state["percent_label"] = ui.label("0%").classes("text-xs font-mono text-gray-600 w-10 text-right")
         state["chapter_label"] = ui.label("").classes("text-2xs text-gray-400")
 
 
@@ -287,6 +289,8 @@ def _save_api_config():
 def _log(msg):
     """添加日志。"""
     state["log_lines"].append(str(msg))
+    if len(state["log_lines"]) > 500:
+        del state["log_lines"][:-500]
     if state.get("log_area"):
         state["log_area"].value = "\n".join(state["log_lines"])
 
@@ -295,6 +299,8 @@ def _update_progress_ui():
     """定时器回调：更新进度 UI。"""
     if state.get("progress_bar"):
         state["progress_bar"].value = state["progress"]
+    if state.get("percent_label"):
+        state["percent_label"].set_text(f"{int(state['progress'] * 100)}%")
     if state.get("chapter_label"):
         state["chapter_label"].set_text(state["current_chapter"])
     if state.get("time_label"):

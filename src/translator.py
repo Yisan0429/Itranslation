@@ -160,7 +160,6 @@ def translate_chapter(
             prev = checkpoint.get("translations", {})
             if chunk.id in prev:
                 translations.append(prev[chunk.id])
-                console.print(f"  [{i+1}/{len(chunks)}] ⏭️ skipped (cached)")
                 if chunk_cb:
                     chunk_cb(i + 1, len(chunks), chunk.id, "skip")
                 continue
@@ -230,13 +229,11 @@ def translate_chapter(
                         console.print(f"     {iss['term']}: {iss['consistency']:.0%} -> suggest '{iss['dominant']}'")
 
             tag = "🔄" if enable_reflection else "✅"
-            console.print(f"  [{i+1}/{len(chunks)}] {tag} {chunk.id}")
             if chunk_cb:
                 chunk_cb(i + 1, len(chunks), chunk.id, "ok")
 
         except Exception as e:
             error_msg = str(e)[:200]
-            console.print(f"  [{i+1}/{len(chunks)}] [red]✗ {chunk.id}: {error_msg}[/red]")
             errors.append({
                 "chunk_id": chunk.id,
                 "chapter": chapter_title,

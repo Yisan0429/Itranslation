@@ -131,11 +131,11 @@ Match: {c['match']}"""
         if not self.findings:
             return None
 
-        table = Table(title="📋 低 Token 审计报告")
-        table.add_column("问题族", style="cyan")
-        table.add_column("严重度", style="yellow")
-        table.add_column("命中数", justify="right")
-        table.add_column("状态")
+        table = Table(title="📋 Low-Token Audit Report")
+        table.add_column("Issue family", style="cyan")
+        table.add_column("Severity", style="yellow")
+        table.add_column("Hits", justify="right")
+        table.add_column("Status")
 
         for family in DEFECT_FAMILIES:
             fid = family["id"]
@@ -146,7 +146,7 @@ Match: {c['match']}"""
                     family["name"],
                     f"[{sev_color}]{family['severity']}[/{sev_color}]",
                     str(count),
-                    "⚠️ 需审查" if family["severity"] in ("P1", "P2") else "📝 建议审查",
+                    "⚠️ needs review" if family["severity"] in ("P1", "P2") else "📝 review suggested",
                 )
 
         return table

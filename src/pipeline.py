@@ -54,6 +54,8 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
   def cb(i,n,cid,status):
    with done_lock:
     done_count[0]+=1; d=done_count[0]
+   tag={'ok':'✅','fail':'✗','skip':'⏭️ skipped (cached)'}.get(status,status)
+   log(f'  [{i}/{n}] {tag} {cid}')
    progress(.15+.55*d/max(total,1),f'Translating: {title} {i}/{n}')
   tr,er=translate_chapter(chapter_title=title,chunks=chunks,vector_store=vs,consistency_model=cm,glossary=glossary,kg=kg,llm_call=llm,config=cfg,checkpoint_path=checkpoint_path_for(book.stem,idx,cfg),cost_lock=cost_lock,chunk_cb=cb)
   with consistency_lock:

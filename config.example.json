@@ -1,8 +1,8 @@
 {
-  "output_dir": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yisan\\Itranslation\\output",
-  "reports_dir": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yisan\\Itranslation\\reports",
-  "cache_dir": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yisan\\Itranslation\\cache",
-  "vector_store_dir": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yisan\\Itranslation\\vector_store",
+  "output_dir": "",
+  "reports_dir": "",
+  "cache_dir": "",
+  "vector_store_dir": "",
   "provider": "custom",
   "model": "deepseek-v4-pro",
   "api_key": "",
@@ -60,5 +60,6 @@
   "max_input_file_mb_abort": 500,
   "max_retries": 3,
   "retry_base_delay": 2,
-  "retry_max_delay": 30
+  "retry_max_delay": 30,
+  "input_dir": ""
 }

@@ -11,7 +11,7 @@
 DEFECT_FAMILIES = [
     {
         "id": "passive_overuse",
-        "name": "被字句过度使用",
+        "name": "Passive overuse",
         "severity": "P2",
         "symptom": "中文译文中出现不必要的被动语态（被/给/让/叫），英文原文并非强制被动",
         "detection": [
@@ -24,7 +24,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "long_modifier",
-        "name": "长定语（前置修饰语过长）",
+        "name": "Long pre-modifier chain",
         "severity": "P2",
         "symptom": "中文句子中前置修饰语超过 20 字，读起来头重脚轻",
         "detection": [
@@ -37,7 +37,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "calque_in_case_of",
-        "name": "在...的情况下（硬译句式）",
+        "name": "In-the-case-of calque",
         "severity": "P3",
         "symptom": "英文 in the case of / when / if 被机械译为'在...的情况下'",
         "detection": [
@@ -49,7 +49,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "calque_shi_de",
-        "name": "是...的（强调句式滥用）",
+        "name": "Shi...de overuse",
         "severity": "P3",
         "symptom": "英文 it is ... that / what ... is 被机械译为'是...的'结构",
         "detection": [
@@ -61,7 +61,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "noun_heavy",
-        "name": "名词化风格（抽象名词堆砌）",
+        "name": "Noun-heavy style",
         "severity": "P2",
         "symptom": "英文抽象名词（-tion/-ity/-ness）被直译为中文名词，而非动词化表达",
         "detection": [
@@ -76,7 +76,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "pronoun_unclear",
-        "name": "代词指代不清",
+        "name": "Unclear pronoun reference",
         "severity": "P1",
         "symptom": "英文 it/they/this/that 被直译为'它/它们/这/那'，中文指代不明",
         "detection": [
@@ -88,7 +88,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "literal_idiom",
-        "name": "习语硬译",
+        "name": "Literal idiom translation",
         "severity": "P2",
         "symptom": "英文习语被逐字翻译而非替换为中文等价表达",
         "detection": [
@@ -102,7 +102,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "sentence_too_long",
-        "name": "句子过长",
+        "name": "Overlong sentence",
         "severity": "P3",
         "symptom": "中文单句超过 80 字符，包含 3 个以上逗号分隔的从句",
         "detection": [
@@ -114,7 +114,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "term_inconsistency",
-        "name": "术语不一致",
+        "name": "Terminology inconsistency",
         "severity": "P1",
         "symptom": "同一英文术语在全书中有多个中文译法（由 consistency model 检测）",
         "detection": [],
@@ -123,7 +123,7 @@ DEFECT_FAMILIES = [
     },
     {
         "id": "bare_source_word",
-        "name": "裸露源语词",
+        "name": "Untranslated source words",
         "severity": "P1",
         "symptom": "英文人名/地名/术语以拉丁字母直接出现在中文正文中",
         "detection": [
