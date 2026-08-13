@@ -38,7 +38,7 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
  for ch in chapters:
   if cancel(): return _result(None,chapters,groups,[],errors,started,cfg)
   t='\n\n'.join(ch.get('paragraphs',[]))
-  if t.strip(): groups.append((ch['title'],chunk_text(t,target_tokens=params.get('target_tokens',1500),max_tokens=cfg.get('chunk_max_tokens',3000),overlap_sentences=overlap)))
+  if t.strip(): groups.append((ch['title'],chunk_text(t,target_tokens=params.get('target_tokens') or cfg.get('chunk_target_tokens',1500),max_tokens=cfg.get('chunk_max_tokens',3000),overlap_sentences=overlap)))
  total=sum(len(x) for _,x in groups); chars=sum(len(c.text) for _,xs in groups for c in xs); progress(.07,f'Translating ({total} chunks)'); shared=ConsistencyModel(threshold=cfg.get('consistency_alert_threshold',0.8)); results=[]; vs=None
  if not params.get('no_rat',False):
   vs=TranslationVectorStore(persist_dir=cfg['vector_store_dir'],use_gpu=cfg.get('use_gpu',True))
@@ -93,15 +93,21 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
     target=shared.term_usage.setdefault(term,{})
     for zh,count in usages.items(): target[zh]=target.get(zh,0)+count
    for term,locs in cm.term_locations.items(): shared.term_locations.setdefault(term,[]).extend(locs)
+   for term,src in cm.term_source.items(): shared.term_source.setdefault(term,src)
   return title,chunks,tr,er
  workers=params.get('parallel',0) or cfg.get('parallel_workers',0); workers=min(workers,len(groups),4) if workers==0 and len(groups)>1 else workers
  if workers>1 and len(groups)>1:
   with ThreadPoolExecutor(max_workers=workers) as pool:
-   fs=[pool.submit(one,t,c,i) for i,(t,c) in enumerate(groups)]
+   fs={pool.submit(one,t,c,i):i for i,(t,c) in enumerate(groups)}
+   by_idx={}; done_chars=0
    for f in as_completed(fs):
     if cancel(): break
-    t,c,tr,er=f.result(); results.append((t,c,tr)); errors.extend(er); progress(.07+.88*min(sum(sum(len(c.text) for c in x[1]) for x in results),chars)/max(chars,1),t)
+    t,c,tr,er=f.result(); by_idx[fs[f]]=(t,c,tr); errors.extend(er)
+    done_chars+=sum(len(x.text) for x in c)
+    progress(.07+.88*min(done_chars,chars)/max(chars,1),t)
    if cancel(): return _result(None,chapters,groups,[],errors,started,cfg)
+   # 按章节索引排序组装 — as_completed 顺序与章节顺序无关，直接 append 会乱序
+   results=[by_idx[i] for i in sorted(by_idx)]
  else:
   for idx,(t,c) in enumerate(groups):
    if cancel(): return _result(None,chapters,groups,[],errors,started,cfg)

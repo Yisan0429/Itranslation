@@ -20,6 +20,7 @@ class Chunk:
     token_count: int = 0
     body_start_sentence: int | None = None
     overlap_sentences: int = 0
+    long_sentence: bool = False
     sentences: list[str] = field(default_factory=list)
 
     @property
@@ -75,11 +76,17 @@ def chunk_text(
     # Step 2: 计算每句 token 数
     sent_tokens = [(s, _estimate_tokens(s)) for s in sentences]
 
+    # 超长句（非占位符句）整体保留，标记 long_sentence 供翻译提示与组装使用
+    long_indices = {
+        i for i, (s, t) in enumerate(sent_tokens)
+        if t > max_tokens and not ("⟨" in s and "⟩" in s)
+    }
+
     # Step 3: 贪心打包
     raw_chunks = _greedy_pack(sent_tokens, target_tokens, max_tokens)
 
     # Step 4: 加重叠
-    chunks = _add_overlap(raw_chunks, sent_tokens, overlap_sentences)
+    chunks = _add_overlap(raw_chunks, sent_tokens, overlap_sentences, long_indices)
 
     console.print(f"[green]Chunking done: {len(chunks)} chunks[/green]")
     return chunks
@@ -189,9 +196,10 @@ def _greedy_pack(
                 current.append(i)
                 curr_tokens = tokens
                 continue
-            # 普通超长句 → 从句切割
-            sub_chunks = _split_long_sentence(i, text, max_single)
-            chunks.extend(sub_chunks)
+            # 普通超长句 → 整体保留（原子化）。
+            # 从句切割会让多个从句共用同一句索引：first_lock 下互相覆盖丢句，
+            # body_join 下句数对齐错位。现代模型上下文足以容纳单句，不切。
+            chunks.append([i])
             continue
 
         # 正常情况：贪心装入
@@ -211,27 +219,11 @@ def _greedy_pack(
     return chunks
 
 
-def _split_long_sentence(sent_idx: int, text: str, max_tokens: int) -> list[list[int]]:
-    """极端长句：在从句边界（分号/冒号/破折号）处切割。"""
-    clauses = re.split(r'(?<=[;:—])\s+', text)
-
-    if len(clauses) <= 1:
-        # 无法从句切割，强制按长度切
-        words = text.split()
-        mid = len(words) // 2
-        return [[sent_idx]]  # 简化：直接放入，标记为长句
-
-    result = []
-    for clause in clauses:
-        result.append([sent_idx])  # 每个从句都标同一个句子索引
-
-    return result
-
-
 def _add_overlap(
     raw_chunks: list[list[int]],
     sent_tokens: list[tuple[str, int]],
     overlap: int,
+    long_indices: set = None,
 ) -> list[Chunk]:
     """
     为每个块添加上下文重叠。
@@ -240,6 +232,7 @@ def _add_overlap(
         实际翻译部分：句 a ~ 句 b
         也同时出现在 chunk N-1 的末尾（overlap 句）
     """
+    long_indices = long_indices or set()
     if overlap <= 0:
         # 无重叠：直接装箱
         result = []
@@ -254,6 +247,7 @@ def _add_overlap(
                 token_count=tokens,
                 body_start_sentence=indices[0],
                 overlap_sentences=0,
+                long_sentence=any(i in long_indices for i in indices),
                 sentences=[sent_tokens[i][0] for i in indices],
             ))
         return result
@@ -282,6 +276,7 @@ def _add_overlap(
             token_count=tokens,
             body_start_sentence=indices[0],
             overlap_sentences=overlap_count,
+            long_sentence=any(i in long_indices for i in indices),
             sentences=[sent_tokens[i][0] for i in extended],
         ))
 

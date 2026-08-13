@@ -79,6 +79,11 @@ DEFAULT_CONFIG = {
     # === 一致性 ===
     "consistency_check_interval": 20,
     "consistency_alert_threshold": 0.8,
+    # 术语抽取：从真实译文增量抽取高频术语对（cheap tier），
+    # 与 KG 预读 glossary 互补，保证预读关闭时一致性审计仍有数据。
+    "enable_term_extraction": True,
+    "term_extraction_interval": 20,   # 每 N 块抽取一次
+    "term_extraction_max_terms": 30,  # 每次最多记录术语数
 
     # === QA ===
     "assembly_strategy": "body_join",  # body_join | first_lock

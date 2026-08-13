@@ -344,7 +344,6 @@ def run_full_benchmark(quick: bool = False):
             total_chrf = 0
             total_overall = 0
             count = 0
-            total_cost = 0
 
             for sample in BENCHMARK_CORPUS:
                 sid = sample["id"]
@@ -384,7 +383,7 @@ def run_full_benchmark(quick: bool = False):
                 chrf_str = f"chrF={bleu_result.get('chrf', '?')}" if bleu_result.get('chrf') else ""
                 overall = judge_result.get("overall", "?") if isinstance(judge_result, dict) else "?"
 
-                console.print(f"    {bleu_str}  {chrf_str}  Judge={overall}/10  ${cost_val:.4f}" if cost_val else f"    {bleu_str}  {chrf_str}  Judge={overall}/10")
+                console.print(f"    {bleu_str}  {chrf_str}  Judge={overall}/10")
 
                 if bleu_result.get("bleu"):
                     total_bleu += bleu_result["bleu"]
@@ -392,8 +391,6 @@ def run_full_benchmark(quick: bool = False):
                     total_chrf += bleu_result["chrf"]
                 if isinstance(judge_result, dict) and "overall" in judge_result:
                     total_overall += judge_result["overall"]
-                if cost_val:
-                    total_cost += cost_val
                 count += 1
 
             # 汇总
@@ -403,7 +400,6 @@ def run_full_benchmark(quick: bool = False):
                     "avg_bleu": round(total_bleu / count, 1) if total_bleu else None,
                     "avg_chrf": round(total_chrf / count, 1) if total_chrf else None,
                     "avg_judge_score": round(total_overall / count, 1) if total_overall else None,
-                    "total_cost_usd": round(total_cost, 4),
                 }
 
                 console.print(f"\n[bold green]── Summary ──[/bold green]")

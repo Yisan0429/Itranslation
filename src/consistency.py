@@ -30,10 +30,12 @@ class ConsistencyModel:
         self.term_usage = defaultdict(lambda: defaultdict(int))
         # term_en → [para_id, ...]
         self.term_locations = defaultdict(list)
+        # term_en → "expected"(来自 KG glossary 的预期译法检查) | "observed"(来自真实译文抽取)
+        self.term_source = {}
         self.total_segments = 0
 
-    def record(self, term_en: str, term_zh: str, para_id: str):
-        """记录一个术语的翻译。"""
+    def record(self, term_en: str, term_zh: str, para_id: str, source: str = "expected"):
+        """记录一个术语的翻译。source: 'expected'（glossary 检查）或 'observed'（译文抽取）。"""
         term_en = term_en.strip()
         term_zh = term_zh.strip()
         if not term_en or not term_zh:
@@ -41,7 +43,27 @@ class ConsistencyModel:
 
         self.term_usage[term_en][term_zh] += 1
         self.term_locations[term_en].append(para_id)
+        self.term_source[term_en] = source
         self.total_segments += 1
+
+    def record_many(
+        self,
+        term_en: str,
+        term_zh: str,
+        para_ids: list,
+        count: int,
+        source: str = "observed",
+    ):
+        """批量记录一个术语在多个位置的 occurrences 次出现（术语抽取路径用）。"""
+        term_en = term_en.strip()
+        term_zh = term_zh.strip()
+        if not term_en or not term_zh or count <= 0:
+            return
+        self.term_usage[term_en][term_zh] += count
+        ids = list(para_ids) if para_ids else [""]
+        self.term_locations[term_en].extend(ids[i % len(ids)] for i in range(count))
+        self.term_source[term_en] = source
+        self.total_segments += count
 
     def check_drift(self, term_en: str) -> dict | None:
         """
@@ -66,6 +88,7 @@ class ConsistencyModel:
                 "consistency": round(ratio, 3),
                 "locations": self.term_locations[term_en][:20],
                 "total_occurrences": total,
+                "source": self.term_source.get(term_en, "expected"),
             }
         return None
 
@@ -115,6 +138,7 @@ class ConsistencyModel:
         data = {
             "term_usage": {k: dict(v) for k, v in self.term_usage.items()},
             "term_locations": dict(self.term_locations),
+            "term_source": dict(self.term_source),
             "total_segments": self.total_segments,
         }
         with open(path, "w", encoding="utf-8") as f:
@@ -134,6 +158,9 @@ class ConsistencyModel:
         for term, locs in data.get("term_locations", {}).items():
             model.term_locations[term] = locs
 
+        for term, src in data.get("term_source", {}).items():
+            model.term_source[term] = src
+
         model.total_segments = data.get("total_segments", 0)
         return model
 
@@ -144,27 +171,37 @@ def generate_consistency_report(
     output_path: str = None,
     threshold: float = 0.8,
 ) -> str:
-    """生成一致性审计报告。"""
+    """生成一致性审计报告（分两节：预期偏离 / 实际漂移）。"""
+    expected = [i for i in issues if i.get("source", "expected") == "expected"]
+    observed = [i for i in issues if i.get("source", "expected") == "observed"]
     lines = [
-        f"consistency audit: scanned {len(glossary)} terms, {len(issues)} drift issues (threshold <{threshold:.0%})",
+        f"consistency audit: scanned {len(glossary)} terms, "
+        f"{len(issues)} drift issues (threshold <{threshold:.0%}) "
+        f"[expected: {len(expected)}, observed: {len(observed)}]",
     ]
 
-    if issues:
-        lines.append("--- Drifted terms ---")
-        for issue in issues:
-            lines.append(f"\n  📛 {issue['term']}")
-            lines.append(f"     consistency: {issue['consistency']:.0%}")
-            lines.append(f"     translation distribution:")
+    def _block(title, items):
+        out = [f"--- {title} ---"]
+        for issue in items:
+            out.append(f"\n  📛 {issue['term']}")
+            out.append(f"     consistency: {issue['consistency']:.0%}")
+            out.append("     translation distribution:")
             for zh, count in issue["translations"].items():
                 marker = " ✅ dominant" if zh == issue["dominant"] else " ⚠️"
-                lines.append(f"       {zh}: {count}x{marker}")
-            lines.append(f"     suggest: unify on '{issue['dominant']}'")
-            lines.append(f"     total occurrences: {issue['total_occurrences']}")
+                out.append(f"       {zh}: {count}x{marker}")
+            out.append(f"     suggest: unify on '{issue['dominant']}'")
+            out.append(f"     total occurrences: {issue['total_occurrences']}")
+        return out
+
+    if expected:
+        lines.extend(_block("Expected-term deviations", expected))
+    if observed:
+        lines.extend(_block("Observed-term drifts", observed))
 
     report = "\n".join(lines)
 
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(report)
-        
+
     return report

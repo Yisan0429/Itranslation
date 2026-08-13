@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.4.0-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
 </p>
 
@@ -13,7 +13,7 @@
 <p align="center"><strong>AI 全书翻译工具 · CLI + 桌面 GUI</strong></p>
 <p align="center">
   PDF · EPUB · TXT · Markdown → 中文<br>
-  句子级分块 · 重叠冗余 · RAT · KG 预读 · Reflection · 术语一致性审计 · 断点续传 · 成本追踪
+  句子级分块 · 重叠冗余 · RAT · KG 预读 · Reflection · 术语一致性审计 · 断点续传 · Token 用量追踪
 </p>
 
 > 项目尚在积极开发中。建议先用短文本（< 3000 词）测试，确认翻译质量与费用符合预期后再处理大文件。翻译中途可能因网络波动或 API 异常中断。
@@ -37,7 +37,7 @@ Itranslation 是一个基于大语言模型的桌面翻译应用，支持将整�
 | 翻译质量 | 单次翻译，无验证 | 重叠冗余 + RAT + KG 预读 + 实时审计 |
 | 译后质检 | 直接输出 | Reflection 反思工作流（翻译 → 反思 → 修订） |
 | 中断处理 | 从头重来 | 断点续传（GUI 与 CLI） |
-| 成本可见性 | 账单出来才知道 | 逐块 token 与费用实时显示 |
+| 成本可见性 | 账单出来才知道 | 逐块 token 用量实时统计（v1.4 起不再显示费用） |
 
 ---
 
@@ -142,7 +142,7 @@ uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4
 |---|---|---|
 | `source_lang` / `target_lang` | `en` / `zh` | 注入 prompt 的语言对 |
 | `genre` | `auto` | 默认体裁（决定风格指令） |
-| `chunk_target_tokens` | `1500` | 每块目标 token 数 |
+| `chunk_target_tokens` | `1500` | 每块目标 token 数（CLI `--target-tokens` 可覆盖） |
 | `chunk_max_tokens` | `3000` | 每块硬上限 |
 | `overlap_by_genre` | 按体裁映射 | 上下文重叠句数 |
 | `enable_reflection` | `false` | 每块"审查 → 修订"循环 |
@@ -160,13 +160,16 @@ uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4
 | `rat_min_distance` | `0.3` | RAT 命中的最大向量距离 |
 | `consistency_check_interval` | `20` | 一致性审计间隔（块） |
 | `consistency_alert_threshold` | `0.8` | 漂移告警阈值 |
+| `enable_term_extraction` | `true` | 从真实译文增量抽取术语对（cheap 档模型） |
+| `term_extraction_interval` | `20` | 术语抽取间隔（块） |
+| `term_extraction_max_terms` | `30` | 每次抽取最多记录术语数 |
 | `assembly_strategy` | `body_join` | `body_join` 或 `first_lock`（旧版兼容） |
 
 **系统**
 
 | 键 | 默认值 | 说明 |
 |---|---|---|
-| `parallel_workers` | `4` | 章节并行翻译数（0 = 串行） |
+| `parallel_workers` | `0` | 章节并行翻译数（0 = 自动：min(章节数, 4)） |
 | `use_gpu` | `true` | RAT 嵌入模型使用 GPU |
 | `max_input_file_mb` | `100` | 输入文件大小警告阈值 |
 | `max_input_file_mb_abort` | `500` | 输入文件大小硬拒绝阈值 |

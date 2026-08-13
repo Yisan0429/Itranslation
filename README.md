@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.4.0-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.0-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
 </p>
 
@@ -13,7 +13,7 @@
 <p align="center"><strong>AI-Powered Book Translation · CLI + Desktop GUI</strong></p>
 <p align="center">
   PDF · EPUB · TXT · Markdown → Chinese<br>
-  Sentence-Level Chunking · Overlap Redundancy · RAT · KG Pre-Read · Reflection · Consistency Audit · Checkpoint/Resume · Cost Tracking
+  Sentence-Level Chunking · Overlap Redundancy · RAT · KG Pre-Read · Reflection · Consistency Audit · Checkpoint/Resume · Token Tracking
 </p>
 
 > This project is under active development. Test with short texts (< 3,000 words) before processing larger files. Translations may be interrupted by network issues or API errors.
@@ -37,7 +37,7 @@ Itranslation is a desktop application and command-line tool for translating enti
 | Translation Quality | Single-pass, no validation | Overlap redundancy + RAT + KG pre-read + real-time audit |
 | Post-Translation QA | Output as-is | Reflection workflow (translate → reflect → revise) |
 | Interruption Handling | Restart from beginning | Checkpoint-based resume (GUI & CLI) |
-| Cost Visibility | Unknown until billing | Real-time per-chunk token and cost display |
+| Cost Visibility | Unknown until billing | Real-time per-chunk token counts (pricing display removed in v1.4) |
 
 ---
 
@@ -142,7 +142,7 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 |---|---|---|
 | `source_lang` / `target_lang` | `en` / `zh` | Language pair injected into prompts |
 | `genre` | `auto` | Default genre for style instructions |
-| `chunk_target_tokens` | `1500` | Target tokens per chunk |
+| `chunk_target_tokens` | `1500` | Target tokens per chunk (CLI `--target-tokens` overrides) |
 | `chunk_max_tokens` | `3000` | Hard cap per chunk |
 | `overlap_by_genre` | per-genre map | Context-overlap sentence counts |
 | `enable_reflection` | `false` | Per-chunk review → revision loop |
@@ -160,13 +160,16 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 | `rat_min_distance` | `0.3` | Max vector distance for RAT hits |
 | `consistency_check_interval` | `20` | Chunks between consistency audits |
 | `consistency_alert_threshold` | `0.8` | Drift flagging threshold |
+| `enable_term_extraction` | `true` | Incremental term-pair extraction from real translations (cheap tier) |
+| `term_extraction_interval` | `20` | Chunks between term-extraction calls |
+| `term_extraction_max_terms` | `30` | Max terms recorded per extraction |
 | `assembly_strategy` | `body_join` | `body_join` or `first_lock` (legacy) |
 
 **System**
 
 | Key | Default | Description |
 |---|---|---|
-| `parallel_workers` | `4` | Parallel chapter translation (0 = serial) |
+| `parallel_workers` | `0` | Parallel chapter translation (0 = auto: min(chapters, 4)) |
 | `use_gpu` | `true` | GPU for the RAT embedding model |
 | `max_input_file_mb` | `100` | Warn threshold for input size |
 | `max_input_file_mb_abort` | `500` | Hard reject threshold |

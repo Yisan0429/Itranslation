@@ -278,7 +278,7 @@ def eval_e2e():
     from api_client import call_api
     from translator import translate_chapter
 
-    def llm(sp, up):
+    def llm(sp, up, tier=None):
         return call_api(
             api_key=cfg.get("api_key", ""),
             api_base=cfg.get("api_base", "https://api.deepseek.com/v1"),
@@ -307,6 +307,11 @@ def eval_e2e():
         elapsed = time.time() - start
 
         full = assemble_translations(chunks, trans, "first_lock")
+
+        # token 用量由翻译器累加在 cfg["_cost"]
+        cost = cfg.get("_cost", {})
+        pt = cost.get("prompt_tokens", 0)
+        ct = cost.get("completion_tokens", 0)
 
         # 基本检查
         issues = []

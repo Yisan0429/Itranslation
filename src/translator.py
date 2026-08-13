@@ -149,11 +149,15 @@ def translate_chapter(
 
     enable_reflection = config.get("enable_reflection", False)
     reflection_depth = config.get("reflection_depth", 1)
+    enable_term_extraction = config.get("enable_term_extraction", True)
+    term_interval = config.get("term_extraction_interval", 20)
+    term_max = config.get("term_extraction_max_terms", 30)
 
     translations = []
     errors = []
 
     failed_ids = []
+    term_batch: list[tuple] = []  # (chunk_id, source_text, target_text)
 
     for i, chunk in enumerate(chunks):
         if chunk.id in done_ids:
@@ -207,6 +211,16 @@ def translate_chapter(
             # 5. 更新一致性模型
             _update_consistency(chunk.text, result, glossary, consistency_model, chunk.id)
 
+            # 5b. 术语抽取批次（每 term_interval 块送 cheap tier 抽取一次）
+            if enable_term_extraction:
+                term_batch.append((chunk.id, chunk.text, result))
+                if (i + 1) % term_interval == 0:
+                    _extract_and_record_terms(
+                        term_batch, llm_call, config, consistency_model,
+                        cost_lock, term_max,
+                    )
+                    term_batch = []
+
             translations.append(result)
 
             # 6. 保存 checkpoint
@@ -257,6 +271,12 @@ def translate_chapter(
                     content_hash,
                     failed_ids,
                 )
+
+    # 章末冲刷：小章节不足一个 interval 时，若批次够 3 块也做一次抽取
+    if enable_term_extraction and len(term_batch) >= 3:
+        _extract_and_record_terms(
+            term_batch, llm_call, config, consistency_model, cost_lock, term_max,
+        )
 
     return translations, errors
 
@@ -484,13 +504,23 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
         )
 
     body_count = getattr(chunk, "body_sentence_count", None)
+    long_sentence = getattr(chunk, "long_sentence", False)
     count_line = ""
     if body_count is not None:
-        count_line = (
-            "\nThe 'Source Text' section contains exactly " + str(body_count)
-            + " sentences. Output exactly " + str(body_count)
-            + " translated sentences."
-        )
+        if long_sentence:
+            count_line = (
+                "\nThe 'Source Text' section contains exactly " + str(body_count)
+                + " sentences, one of which is extremely long. Output "
+                + str(body_count)
+                + " translated sentences; the long one may be rendered as several "
+                "shorter Chinese sentences, each on its own line (separated by '␟')."
+            )
+        else:
+            count_line = (
+                "\nThe 'Source Text' section contains exactly " + str(body_count)
+                + " sentences. Output exactly " + str(body_count)
+                + " translated sentences."
+            )
 
     user = TRANSLATION_USER_PROMPT.format(
         sentence_instruction=SENTENCE_INSTRUCTION + count_line,
@@ -536,9 +566,49 @@ def _update_consistency(source: str, target: str, glossary: dict, model: Consist
     for en_term in _extract_glossary_terms(source, glossary):
         zh_expected = glossary[en_term]["zh"]
         if zh_expected in target:
-            model.record(en_term, zh_expected, chunk_id)
+            model.record(en_term, zh_expected, chunk_id, source="expected")
         else:
-            model.record(en_term, f"[非标准] {zh_expected}", chunk_id)
+            model.record(en_term, f"[非标准] {zh_expected}", chunk_id, source="expected")
+
+
+def _extract_and_record_terms(
+    batch: list[tuple],
+    llm_call: Callable,
+    config: dict,
+    consistency_model: ConsistencyModel,
+    cost_lock: threading.Lock | None,
+    max_terms: int,
+):
+    """把一批 (chunk_id, source, target) 送去 cheap tier 抽取术语，并计入一致性模型。
+
+    抽取失败/无结果只降级：打印警告，不影响翻译主流程。
+    """
+    from term_extractor import extract_terms_batch, count_occurrences
+
+    srcs = [s for _, s, _ in batch]
+    tgts = [t for _, _, t in batch]
+    ids = [cid for cid, _, _ in batch]
+
+    terms, usage = extract_terms_batch(srcs, tgts, llm_call, max_terms=max_terms)
+    if usage:
+        if cost_lock:
+            with cost_lock:
+                _accumulate_cost(config, usage)
+        else:
+            _accumulate_cost(config, usage)
+
+    recorded = 0
+    for term in terms:
+        cnt = count_occurrences(term["en"], srcs)
+        if cnt < 2:
+            continue  # 低频词不纳入一致性追踪
+        consistency_model.record_many(term["en"], term["zh"], ids, cnt, source="observed")
+        recorded += 1
+    if terms:
+        console.print(
+            f"  [dim]🔍 term extraction: {len(terms)} candidates, "
+            f"{recorded} recorded (>=2 occurrences)[/dim]"
+        )
 
 
 def _load_checkpoint(path: str) -> dict:

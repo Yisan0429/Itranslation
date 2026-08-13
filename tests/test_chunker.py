@@ -69,3 +69,30 @@ def test_sentence_integrity_after_dedup_join():
         joined.extend(body)
 
     assert joined == sents, f"拼接后 {len(joined)} 句 != 原文 {len(sents)} 句"
+
+
+def test_long_sentence_atomic():
+    """P0-3：含分号的超长句必须整体保留为单块（从句切割会造成同句索引重复）。"""
+    long_sent = ("Clause " + "x " * 500 + "; clause " + "y " * 500 + ".")
+    text = "Short sentence one. " + long_sent + " Short sentence two."
+
+    chunks = chunk_text(text, target_tokens=10, max_tokens=100, overlap_sentences=3)
+
+    long_chunks = [c for c in chunks if c.long_sentence]
+    assert len(long_chunks) == 1, f"应有恰好 1 个长句块, 实际 {len(long_chunks)}"
+    lc = long_chunks[0]
+    # 原子化：整句一个块，句索引唯一且句数=1
+    assert lc.start_sentence == lc.end_sentence
+    assert lc.body_sentence_count == 1
+    assert long_sent in lc.text
+    # 其它块的句索引不得与长句块重复
+    for c in chunks:
+        if c is not lc:
+            assert not (lc.start_sentence <= c.end_sentence and c.start_sentence <= lc.end_sentence), \
+                "长句索引与其他块重叠"
+    # 组装完整性：所有块正文句拼接后与原文句序列一致
+    joined = []
+    for c in sorted(chunks, key=lambda x: x.start_sentence):
+        body = c.sentences[c.overlap_sentences:] if c.overlap_sentences else c.sentences
+        joined.extend(body)
+    assert long_sent in joined

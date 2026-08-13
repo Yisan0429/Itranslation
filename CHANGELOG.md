@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.5.0 (2026-08-14)
+
+### 修复
+- 并行翻译章节乱序：多章并行时按 as_completed 完成顺序组装，现改为按章节索引排序输出
+- benchmark 全量模式 NameError（cost_val 残留引用），评估循环从未真实跑通；移除残留价格字段
+- 超长句从句切割致同句索引重复、组装错位：超长句原子化整体保留（Chunk.long_sentence + 翻译提示注入）
+- chunk_target_tokens 死键复活：CLI --target-tokens 默认未指定，config.json 值生效
+
+### 新增
+- 术语抽取 `term_extractor`：每 N 块用 cheap tier 从真实译文增量抽取高频术语对并计入一致性模型；审计报告分「预期偏离 / 实际漂移」两节；预读关闭时一致性审计不再空转
+- 配置新增 `enable_term_extraction` / `term_extraction_interval` / `term_extraction_max_terms`
+- 测试补强至 28 项：pipeline 并行保序与配置优先级、benchmark 回归、长句原子化、术语抽取与一致性接线
+- `scripts/check_version.py` 版本一致性检查脚本
+- CI（GitHub Actions）：ruff + pytest + benchmark --quick + 版本检查
+
 ## v1.4.2 (2026-08-13)
 
 ### 修复
