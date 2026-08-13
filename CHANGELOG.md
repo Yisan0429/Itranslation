@@ -9,7 +9,7 @@
 - chunk_target_tokens 死键复活：CLI --target-tokens 默认未指定，config.json 值生效
 
 ### 新增
-- 术语抽取 `term_extractor`：每 N 块用 cheap tier 从真实译文增量抽取高频术语对并计入一致性模型；审计报告分「预期偏离 / 实际漂移」两节；预读关闭时一致性审计不再空转
+- 术语抽取 `term_extractor`：每 N 块用 cheap tier 从真实译文增量抽取高频术语对并计入一致性模型；审计报告分「预期偏离 / 实际漂移」两节；预读关闭时一致性审计不再空转（**默认关闭**，需 `enable_term_extraction: true` 显式开启）
 - 配置新增 `enable_term_extraction` / `term_extraction_interval` / `term_extraction_max_terms`
 - 测试补强至 28 项：pipeline 并行保序与配置优先级、benchmark 回归、长句原子化、术语抽取与一致性接线
 - `scripts/check_version.py` 版本一致性检查脚本

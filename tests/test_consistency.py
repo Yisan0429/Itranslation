@@ -77,8 +77,8 @@ def test_translator_term_extraction_wiring(tmp_path):
     assert cm.term_source["entropy"] == "observed"
 
 
-def test_translator_term_extraction_disabled():
-    """enable_term_extraction=False 时不调用抽取 LLM。"""
+def test_translator_term_extraction_default_off():
+    """默认关闭：config 未含 enable_term_extraction 时不调用抽取 LLM。"""
     chunks = [_make_chunk(0, "The entropy of the system increases.")]
 
     calls = []
@@ -89,6 +89,6 @@ def test_translator_term_extraction_disabled():
     cm = ConsistencyModel()
     translate_chapter(
         "Test", chunks, None, cm, {}, {}, fake_llm,
-        {"genre": "auto", "enable_term_extraction": False},
+        {"genre": "auto"},  # 无 enable_term_extraction 键 → 默认关闭
     )
     assert not any("terminology extraction" in c for c in calls)

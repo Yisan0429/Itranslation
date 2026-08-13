@@ -149,7 +149,7 @@ def translate_chapter(
 
     enable_reflection = config.get("enable_reflection", False)
     reflection_depth = config.get("reflection_depth", 1)
-    enable_term_extraction = config.get("enable_term_extraction", True)
+    enable_term_extraction = config.get("enable_term_extraction", False)
     term_interval = config.get("term_extraction_interval", 20)
     term_max = config.get("term_extraction_max_terms", 30)
 
@@ -530,16 +530,6 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
 
     return system, user
 
-
-def _get_style_instruction(genre: str) -> str:
-    styles = {
-        "literature": "Literary translation. Preserve rhetorical devices, rhythm, emotional tone. Use elegant modern Chinese. Adapt idioms naturally.",
-        "philosophy": "Faithful direct translation. Preserve logical structure. Do not split long sentences. Consistent terminology.",
-        "natural_science": "Faithful direct translation. Terminology accuracy over fluency. Preserve data, units, scientific notation exactly.",
-        "social_science": "Faithful translation with readability. Consistent terminology. Preserve citations.",
-        "technical": "Accurate technical translation. Preserve code, commands, config values unchanged.",
-    }
-    return styles.get(genre, styles["natural_science"])
 
 
 def _extract_glossary_terms(text: str, glossary: dict) -> list[str]:

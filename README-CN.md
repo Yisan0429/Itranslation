@@ -160,7 +160,7 @@ uv run python translate_book.py book.txt --provider deepseek --model deepseek-v4
 | `rat_min_distance` | `0.3` | RAT 命中的最大向量距离 |
 | `consistency_check_interval` | `20` | 一致性审计间隔（块） |
 | `consistency_alert_threshold` | `0.8` | 漂移告警阈值 |
-| `enable_term_extraction` | `true` | 从真实译文增量抽取术语对（cheap 档模型） |
+| `enable_term_extraction` | `false` | 从真实译文增量抽取术语对（cheap 档模型；默认关闭，开启会增加 API 调用） |
 | `term_extraction_interval` | `20` | 术语抽取间隔（块） |
 | `term_extraction_max_terms` | `30` | 每次抽取最多记录术语数 |
 | `assembly_strategy` | `body_join` | `body_join` 或 `first_lock`（旧版兼容） |

@@ -160,7 +160,7 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 | `rat_min_distance` | `0.3` | Max vector distance for RAT hits |
 | `consistency_check_interval` | `20` | Chunks between consistency audits |
 | `consistency_alert_threshold` | `0.8` | Drift flagging threshold |
-| `enable_term_extraction` | `true` | Incremental term-pair extraction from real translations (cheap tier) |
+| `enable_term_extraction` | `false` | Incremental term-pair extraction from real translations (cheap tier; opt-in, adds API calls) |
 | `term_extraction_interval` | `20` | Chunks between term-extraction calls |
 | `term_extraction_max_terms` | `30` | Max terms recorded per extraction |
 | `assembly_strategy` | `body_join` | `body_join` or `first_lock` (legacy) |
