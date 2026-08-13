@@ -33,21 +33,23 @@ DEFAULT_CONFIG = {
 
     # === 三档模型策略（Wenyi 风格） ===
     # 按任务重要性分三档：
-    #   strong: 翻译/润色 — deepseek-v4-pro（最高质量）
-    #   cheap:  审校/一致性QA — deepseek-v4-flash（判断类，开思考）
-    #   fast:   预读/术语抽取 — deepseek-v4-flash（机械任务，关思考省钱）
+    #   strong: 翻译/润色 — deepseek-v4-pro
+    #   cheap:  审校/一致性QA — deepseek-v4-flash
+    #   fast:   预读/术语抽取 — deepseek-v4-flash
     # 未配置 llm_tiers 时回退到单模型 "model"。
+    # 默认全部 low：翻译是"逐块生成"型任务，深度思考显著拖慢每块延迟而收益有限；
+    # 需要更高推理档时在 config.json 里改对应 tier，或用顶层 reasoning_effort
+    # 覆盖所有档位（GUI 的 Reasoning 下拉即写入该键）。
     "use_tiered_models": True,
-    "reasoning_effort": "high",
     "custom_prompt": "",
     "llm_tiers": {
         "strong": {
             "model": "deepseek-v4-pro",
-            "reasoning_effort": "high",
+            "reasoning_effort": "low",
         },
         "cheap": {
             "model": "deepseek-v4-flash",
-            "reasoning_effort": "high",
+            "reasoning_effort": "low",
         },
         "fast": {
             "model": "deepseek-v4-flash",
@@ -90,6 +92,9 @@ DEFAULT_CONFIG = {
     "assembly_strategy": "body_join",  # body_join | first_lock
     # 译文句数与正文句数不符时的处理: warn(仅警告) | retry_once(重译一次,默认) | mark(译文前加标记)
     "on_count_mismatch": "retry_once",
+    # 文学体裁的句数失配策略（独立于 on_count_mismatch，默认 warn）：
+    # 中文流水句天然合并/拆分英文句子，文学书强制 1:1 会高频触发整块重译（双倍耗时）。
+    "on_count_mismatch_literature": "warn",
     # 严格组装: true 时句数不符直接报错(调试/测试用)
     "strict_assembly": False,
 
@@ -108,7 +113,8 @@ DEFAULT_CONFIG = {
     "use_gpu": True,
 
     # === 并行 ===
-    "parallel_workers": 0,  # 并行翻译章节数（0=自动：min(章节数,4)）
+    "parallel_workers": 0,  # 并行翻译章节数（0=自动：min(章节数, max_parallel_workers)）
+    "max_parallel_workers": 8,  # 自动并行的上限（API 限流时可调小）
 
     # === 文件限制 ===
     "max_input_file_mb": 100,  # 输入文件最大 MB（超出警告）

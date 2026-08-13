@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.5.1 (2026-08-14)
+
+### 性能（Q3 提速，全书速度不达标问题）
+
+- **普通书章节识别**（`src/chunker.py`）：`parse_structure` 新增 Gutenberg 纯文本章节头正则（`CHAPTER I` / `Chapter 1` / `BOOK TWO` / `PART III` 等，短行限定防误判），此前非 Markdown 输入的整本书被识别为单一 `Body` 章 → 完全串行翻译
+- **自动并行上限 4 → 8**（`src/pipeline.py`）：新增配置 `max_parallel_workers`（默认 8，API 限流可调小）；显式 `--parallel` 不受上限约束
+- **推理档位默认全 low**（`src/config.py`）：删除顶层 `reasoning_effort: high`（原先覆盖全部 tier，预读/审计都深度思考）；`llm_tiers` 三档默认 low；config.json / GUI 显式设置顶层 `reasoning_effort` 时仍覆盖所有档位（GUI Reasoning 下拉语义不变，默认改 Low）
+- **句数失配策略按体裁 + ±1 容差**（`src/translator.py`）：新增 `on_count_mismatch_literature`（默认 warn），文学体裁不再为中文流水句的自然合并/拆分整块重译；非文学 retry_once 仅在句数差 >1 时触发重译
+- **前缀缓存友好 prompt 布局**：RAT 参考译文从 system prompt 移入 user prompt，system prompt 全书恒定 → DeepSeek 前缀缓存可跨块命中（prefill 提速降费）；usage 采集 `prompt_cache_hit_tokens` 观测命中
+- **checkpoint 落盘节流**：每 10 块 + 章末 + 失败立即保存（原每块全量 json.dump，O(n²) 热路径磁盘 I/O）
+- **向量库单写队列**（`src/vector_store.py`）：`SafeVectorStore` 包装 Chroma 写入，多章并行时检索只读、落库单线程按序，消除并发竞争
+
+### 观测（S6 计时埋点）
+
+- `api_client` usage 增加 `elapsed_sec` / `attempts` / `prompt_cache_hit_tokens`
+- 管线分阶段计时（extract/preread/chunk/translate/audit/assemble）与速度汇总行：`chars/min | chunks/min | tok/min | API 调用数/耗时/传输重试/句数重译/缓存命中 | phases`
+
+### 其它
+
+- GUI Reasoning 下拉默认 High → Low（与提速默认对齐）
+- 测试 43 → 54 项：章节识别、±1 容差、文学 warn、RAT prompt 布局、checkpoint 节流、SafeVectorStore
+
 ## v1.5.0 (2026-08-14)
 
 ### 修复

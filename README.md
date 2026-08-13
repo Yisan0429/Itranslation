@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.11+-blue?logo=python" alt="Python">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
-  <img src="https://img.shields.io/badge/version-1.5.0-536DFE" alt="Version">
+  <img src="https://img.shields.io/badge/version-1.5.1-536DFE" alt="Version">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey" alt="Platform">
 </p>
 
@@ -134,7 +134,8 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 | `max_tokens_per_chunk` | `8192` | Max output tokens per translation call |
 | `litellm_api_key` | env `LITELLM_API_KEY` | Key used when `provider=litellm` |
 | `use_tiered_models` | `true` | Route calls through `llm_tiers` |
-| `llm_tiers` | strong/cheap/fast | Per-tier `model` + `reasoning_effort` |
+| `llm_tiers` | strong/cheap/fast | Per-tier `model` + `reasoning_effort` (all `low` by default for speed; set higher for quality-critical work) |
+| `reasoning_effort` | (unset) | Optional top-level override applied to ALL tiers (GUI Reasoning dropdown writes this) |
 
 **Translation**
 
@@ -163,7 +164,8 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 | `enable_term_extraction` | `false` | Incremental term-pair extraction from real translations (cheap tier; opt-in, adds API calls) |
 | `term_extraction_interval` | `20` | Chunks between term-extraction calls |
 | `term_extraction_max_terms` | `30` | Max terms recorded per extraction |
-| `on_count_mismatch` | `retry_once` | Sentence-count mismatch handling: `warn` / `retry_once` / `mark` |
+| `on_count_mismatch` | `retry_once` | Sentence-count mismatch handling: `warn` / `retry_once` / `mark` (retry only when off by >1 sentence) |
+| `on_count_mismatch_literature` | `warn` | Sentence-count policy for the literature genre (Chinese naturally merges/splits sentences; retrying every ±1 mismatch doubles runtime) |
 | `strict_assembly` | `false` | Raise on missing sentences instead of warning (debug/QA) |
 | `assembly_strategy` | `body_join` | `body_join` or `first_lock` (legacy) |
 
@@ -171,7 +173,8 @@ All settings are merged at runtime: defaults (`src/config.py` `DEFAULT_CONFIG`) 
 
 | Key | Default | Description |
 |---|---|---|
-| `parallel_workers` | `0` | Parallel chapter translation (0 = auto: min(chapters, 4)) |
+| `parallel_workers` | `0` | Parallel chapter translation (0 = auto: min(chapters, `max_parallel_workers`)) |
+| `max_parallel_workers` | `8` | Cap for auto-parallelism (lower it if the API rate-limits) |
 | `use_gpu` | `true` | GPU for the RAT embedding model |
 | `max_input_file_mb` | `100` | Warn threshold for input size |
 | `max_input_file_mb_abort` | `500` | Hard reject threshold |
@@ -211,7 +214,7 @@ Optional translate → reflect → revise loop; roughly 2× token consumption fo
 
 ### Parallel Translation
 
-Chapters are translated concurrently with a configurable thread pool (default auto: min(chapters, 4); set `parallel_workers: 0` to disable).
+Chapters are translated concurrently with a configurable thread pool (default auto: min(chapters, 8); set `parallel_workers: 0` to disable). Plain-text chapter headings (`CHAPTER I`, `Chapter 1`, `BOOK ONE`, ...) are auto-detected, so real books parallelize too.
 
 ### Checkpoint & Resume
 

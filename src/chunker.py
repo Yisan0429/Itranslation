@@ -315,6 +315,27 @@ def _add_overlap(
     return result
 
 
+# 普通书章节头识别（Gutenberg 纯文本格式，无 Markdown 标题）：
+#   CHAPTER I / Chapter 1 / CHAPTER XII. / BOOK ONE / PART II / Section 3 ...
+# 只匹配短行（章节标题行很短），避免误伤正文中以 "Chapter ..." 开头的句子。
+_CHAPTER_NUM = r"(?:[IVXLCDM]+|\d+|[Oo]ne|[Tt]wo|[Tt]hree|[Ff]our|[Ff]ive|[Ss]ix|[Ss]even|[Ee]ight|[Nn]ine|[Tt]en|[Ee]leven|[Tt]welve)"
+_PLAIN_CHAPTER_RE = re.compile(
+    rf"^(?:(?:chapter|chap|ch)\.?\s+{_CHAPTER_NUM}"
+    rf"|(?:book|part|section|sec)\.?\s+{_CHAPTER_NUM})"
+    rf"\b(?:\s*[.:\-—]\s*.*)?$",
+    re.IGNORECASE,
+)
+
+
+def _plain_chapter_title(line: str) -> str | None:
+    """识别普通书章节头（非 Markdown），返回标题或 None。"""
+    if len(line) > 60:  # 章节标题是短行
+        return None
+    if _PLAIN_CHAPTER_RE.match(line):
+        return line.strip().rstrip(".").strip()
+    return None
+
+
 def parse_structure(markdown_text: str) -> list[dict]:
     """
     从 Markdown 中恢复章节结构。
@@ -331,11 +352,14 @@ def parse_structure(markdown_text: str) -> list[dict]:
         if not stripped:
             continue
 
+        title = _plain_chapter_title(stripped)
         if stripped.startswith("## ") or stripped.startswith("# "):
+            title = stripped.lstrip("# ").strip()
+        if title:
             # 新章节
             if current_chapter and current_chapter.get("paragraphs"):
                 chapters.append(current_chapter)
-            current_chapter = {"title": stripped.lstrip("# ").strip(), "paragraphs": []}
+            current_chapter = {"title": title, "paragraphs": []}
         elif current_chapter is not None:
             current_chapter["paragraphs"].append(stripped)
         else:

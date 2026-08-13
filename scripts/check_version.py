@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
-TARGET = "1.5.0"
+TARGET = "1.5.1"
 
 
 def fail(msg: str) -> bool:

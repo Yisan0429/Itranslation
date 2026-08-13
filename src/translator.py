@@ -13,6 +13,7 @@ Retrieval-Augmented Translation:
 from __future__ import annotations
 
 import json
+import os
 import time
 import threading
 from typing import Callable
@@ -25,6 +26,9 @@ from assembler import SENTENCE_SEPARATOR, SENTENCE_INSTRUCTION
 console = Console()
 
 BATCH_DELIMITER = "\n\n␞␞␞\n\n"
+
+# checkpoint 落盘节流：每 N 块保存一次（另在章末与失败时立即保存）
+CHECKPOINT_SAVE_INTERVAL = 10
 
 # ── Reflection Prompts ──────────────────────────────────────────────
 
@@ -94,14 +98,16 @@ Return ONLY the translated text — no preambles, no notes, no markdown wrapping
 
 ## Terminology Reference
 
-{glossary_section}
-
-## Context from Previous Translations
-
-{rat_section}"""
+{glossary_section}"""
 
 
+# 注意：RAT 参考译文放 user prompt（每块不同），system prompt 全书恒定，
+# 这样 DeepSeek 等提供方的前缀缓存（KV cache）可以跨块命中，降低 prefill 延迟与费用。
 TRANSLATION_USER_PROMPT = """{sentence_instruction}{context_section}
+
+## Previously Translated Passages (reference for style/terminology consistency)
+
+{rat_section}
 
 ## Source Text (translate ONLY the sentences below)
 
@@ -197,12 +203,16 @@ def translate_chapter(
             )
             _merge_usage(usage, extra_usage)
 
-            # 累加成本（线程安全）
+            # 累加成本与计时（线程安全）
             if cost_lock:
                 with cost_lock:
                     _accumulate_cost(config, usage)
+                    _accumulate_timing(config, usage)
+                    _accumulate_timing(config, extra_usage)
             else:
                 _accumulate_cost(config, usage)
+                _accumulate_timing(config, usage)
+                _accumulate_timing(config, extra_usage)
 
             # 4. 存储到向量库
             if vector_store is not None:
@@ -230,8 +240,8 @@ def translate_chapter(
 
             translations.append(result)
 
-            # 6. 保存 checkpoint
-            if checkpoint_path:
+            # 6. 保存 checkpoint（节流：每 10 块 + 章末 + 失败立即，避免热路径全量磁盘写入）
+            if checkpoint_path and (i + 1) % CHECKPOINT_SAVE_INTERVAL == 0:
                 _save_checkpoint(
                     checkpoint_path,
                     {ch.id: t for ch, t in zip(chunks[:len(translations)], translations)},
@@ -339,8 +349,10 @@ def _translate_with_reflection(
         if cost_lock:
             with cost_lock:
                 _accumulate_cost(config, usage_r)
+                _accumulate_timing(config, usage_r)
         else:
             _accumulate_cost(config, usage_r)
+            _accumulate_timing(config, usage_r)
 
         # 如果翻译已经很好，跳过修订
         if reflection.strip().startswith("[OK]"):
@@ -365,8 +377,10 @@ def _translate_with_reflection(
         if cost_lock:
             with cost_lock:
                 _accumulate_cost(config, usage_v)
+                _accumulate_timing(config, usage_v)
         else:
             _accumulate_cost(config, usage_v)
+            _accumulate_timing(config, usage_v)
 
         current = revised
         console.print(f"    [dim]Reflection #{round_num+1}: revised[/dim]")
@@ -449,6 +463,34 @@ def _accumulate_cost(config: dict, usage: dict):
     total_cost["completion_tokens"] += usage.get("completion_tokens", 0)
 
 
+def _accumulate_timing(config: dict, usage: dict):
+    """累加 API 计时统计到 config['_timing']（S6 观测：调用数/耗时/重试/缓存命中）。"""
+    if not usage:
+        return
+    t = config.setdefault("_timing", _empty_timing())
+    t["api_calls"] = t.get("api_calls", 0) + 1
+    t["api_sec"] = t.get("api_sec", 0) + usage.get("elapsed_sec", 0)
+    t["api_retries"] = t.get("api_retries", 0) + max(0, usage.get("attempts", 1) - 1)
+    t["cache_hit_tokens"] = t.get("cache_hit_tokens", 0) + usage.get("prompt_cache_hit_tokens", 0)
+
+
+def _record_timing(config: dict, key: str, delta, lock):
+    """累加单个计时计数字段（如句数失配重译次数）。"""
+    def _bump():
+        t = config.setdefault("_timing", _empty_timing())
+        t[key] = t.get(key, 0) + delta
+
+    if lock:
+        with lock:
+            _bump()
+    else:
+        _bump()
+
+
+def _empty_timing() -> dict:
+    return {"api_calls": 0, "api_sec": 0.0, "api_retries": 0, "cache_hit_tokens": 0, "count_retries": 0}
+
+
 def _build_rat_context(chunk, vector_store, glossary: dict, kg: dict, config: dict) -> list[dict]:
     if vector_store is None:
         return []
@@ -508,7 +550,6 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
             genre=genre,
             style_instruction=style,
             glossary_section=glossary_section,
-            rat_section=rat_section,
         )
 
     # 重叠上下文句仅供理解，不翻译；只翻译正文句
@@ -549,6 +590,7 @@ def _build_translation_prompt(chunk, rat_context: list[dict], glossary: dict, kg
     user = TRANSLATION_USER_PROMPT.format(
         sentence_instruction=SENTENCE_INSTRUCTION + count_line,
         context_section=context_section,
+        rat_section=rat_section,
         source_text=source_text,
     )
 
@@ -585,11 +627,12 @@ def _ensure_sentence_count(
 ) -> tuple[str, dict]:
     """P2-12: 译文句数与正文句数不符时的修复策略。
 
-    mode = config['on_count_mismatch']:
+    mode = 有效策略（文学体裁默认改查 on_count_mismatch_literature）:
       - warn:       仅警告，保留原译文
       - retry_once: 附带强化指令重译一次；仍不符则加标记（默认）
       - mark:       译文前加【⚠️句数不符】标记供人工定位
     长句块（long_sentence）与失败占位符不做校验。
+    相差 ±1 句视为模型自然合并/拆分（中文流水句），不重译、不标记。
     """
     if result.startswith("[翻译失败:"):
         return result, {}
@@ -601,13 +644,19 @@ def _ensure_sentence_count(
     got = _count_output_sentences(result)
     if got == expected:
         return result, {}
+    # ±1 句差异：模型把两句并成一句或一句拆成两句，属正常中文流水句，不处理
+    if abs(got - expected) <= 1:
+        return result, {}
 
     mode = config.get("on_count_mismatch", "retry_once")
+    if config.get("genre", "auto") == "literature":
+        mode = config.get("on_count_mismatch_literature", "warn")
     if mode == "mark":
         console.print(f"  [yellow]⚠️ {getattr(chunk, 'id', '?')}: sentence count mismatch ({got} != {expected}), marked[/yellow]")
         return f"【⚠️句数不符 期望{expected} 实得{got}】\n" + result, {}
 
     if mode == "retry_once":
+        _record_timing(config, "count_retries", 1, cost_lock)
         retry_user = (
             user_prompt
             + f"\n\n[RETRY] Your previous output contained {got} sentences, but the "
@@ -679,8 +728,10 @@ def _extract_and_record_terms(
         if cost_lock:
             with cost_lock:
                 _accumulate_cost(config, usage)
+                _accumulate_timing(config, usage)
         else:
             _accumulate_cost(config, usage)
+            _accumulate_timing(config, usage)
 
     recorded = 0
     for term in terms:
@@ -719,6 +770,8 @@ def _save_checkpoint(path: str, translations: dict, chapter: str, done: int, tot
         "content_hash": content_hash,
         "updated_at": time.time(),
     }
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-

@@ -115,3 +115,49 @@ def test_quote_dialogue_not_split():
     text = '"Hello. World." he said. She nodded.'
     sents = [s for s in _split_sentences(text) if s not in ("§", "¶")]
     assert sents == ['"Hello. World." he said.', "She nodded."]
+
+
+def test_parse_structure_plain_book_chapters():
+    """v1.5.1：Gutenberg 纯文本章节头（无 Markdown #）必须被识别为章节，解锁并行。"""
+    from chunker import parse_structure
+
+    text = (
+        "CHAPTER I\n"
+        "The story begins here.\n"
+        "\n"
+        "Chapter 2\n"
+        "Second chapter text.\n"
+        "\n"
+        "BOOK TWO\n"
+        "Book two text.\n"
+        "\n"
+        "PART III. The End\n"
+        "Part three text.\n"
+    )
+    chapters = parse_structure(text)
+    assert [c["title"] for c in chapters] == ["CHAPTER I", "Chapter 2", "BOOK TWO", "PART III. The End"]
+    assert chapters[0]["paragraphs"] == ["The story begins here."]
+    assert chapters[2]["paragraphs"] == ["Book two text."]
+
+
+def test_parse_structure_markdown_still_works():
+    from chunker import parse_structure
+
+    text = "# Book\n\n## Chapter One\nSome text.\n\n## Chapter Two\nMore text.\n"
+    chapters = parse_structure(text)
+    # 无正文的空章（# Book 之后直接跟 ## Chapter One）按原语义被丢弃
+    assert [c["title"] for c in chapters] == ["Chapter One", "Chapter Two"]
+    assert chapters[0]["paragraphs"] == ["Some text."]
+
+
+def test_parse_structure_body_text_not_chapter():
+    """正文中以 'Chapter ...' 开头的长句不得被误判为章节头。"""
+    from chunker import parse_structure
+
+    text = (
+        "Chapter after chapter, the days passed slowly and nothing changed at all.\n"
+        "More body text here.\n"
+    )
+    chapters = parse_structure(text)
+    assert [c["title"] for c in chapters] == ["Body"]
+    assert len(chapters[0]["paragraphs"]) == 2

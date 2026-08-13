@@ -132,17 +132,15 @@ def _call_via_http(
     }
 
     last_error = None
+    started = time.time()
     for attempt in range(max_retries):
         try:
             req = urllib.request.Request(url, data=payload, headers=headers)
             with urllib.request.urlopen(req, timeout=120) as resp:
                 result = json.loads(resp.read())
                 content = result["choices"][0]["message"]["content"]
-                usage = result.get("usage", {})
-                return content.strip(), {
-                    "prompt_tokens": usage.get("prompt_tokens", 0),
-                    "completion_tokens": usage.get("completion_tokens", 0),
-                }
+                usage = result.get("usage", {}) or {}
+                return content.strip(), _usage_dict(usage, started, attempt + 1)
         except urllib.error.HTTPError as e:
             body = e.read().decode() if e.fp else str(e)
             last_error = RuntimeError(f"API 错误 ({e.code}): {body[:500]}")
@@ -155,6 +153,18 @@ def _call_via_http(
             time.sleep(delay)
 
     raise last_error
+
+
+def _usage_dict(usage: dict, started: float, attempts: int) -> dict:
+    """把 API usage 归一为含计时/缓存的统计 dict。"""
+    return {
+        "prompt_tokens": usage.get("prompt_tokens", 0),
+        "completion_tokens": usage.get("completion_tokens", 0),
+        # DeepSeek 前缀缓存命中 token（观测 system prompt 恒定后的缓存收益）
+        "prompt_cache_hit_tokens": usage.get("prompt_cache_hit_tokens", 0),
+        "elapsed_sec": round(time.time() - started, 2),
+        "attempts": attempts,
+    }
 
 
 def _call_via_litellm(
@@ -202,12 +212,23 @@ def _call_via_litellm(
         kwargs["api_base"] = api_base
 
     try:
+        started = time.time()
         response = litellm.completion(**kwargs)
         content = response.choices[0].message.content
         usage = response.usage
+        if usage:
+            usage_vars = vars(usage)
+            return (content.strip() if content else ""), {
+                "prompt_tokens": usage.prompt_tokens or 0,
+                "completion_tokens": usage.completion_tokens or 0,
+                "prompt_cache_hit_tokens": usage_vars.get("prompt_cache_hit_tokens", 0) or 0,
+                "elapsed_sec": round(time.time() - started, 2),
+                "attempts": 1,
+            }
         return (content.strip() if content else ""), {
-            "prompt_tokens": usage.prompt_tokens if usage else 0,
-            "completion_tokens": usage.completion_tokens if usage else 0,
+            "prompt_tokens": 0, "completion_tokens": 0,
+            "prompt_cache_hit_tokens": 0,
+            "elapsed_sec": round(time.time() - started, 2), "attempts": 1,
         }
     except Exception as e:
         raise RuntimeError(f"liteLLM 调用失败 [{model}]: {e}")

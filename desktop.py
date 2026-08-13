@@ -43,7 +43,7 @@ state = {
     "enable_rat": False,
     "use_vision": False,
     "enable_reflection": False,
-    "reasoning_effort": "high",
+    "reasoning_effort": "low",
     "custom_prompt": "",
     "translating": False,
     "cancel_flag": False,
@@ -100,7 +100,7 @@ def _build_control_panel():
             with ui.column().classes("flex-1"):
                 ui.label("Reasoning").classes("text-xs text-gray-500")
                 ui.select({"Low": "low", "High": "high", "Max": "max", "Off": "off"},
-                          value="Off",
+                          value="Low",
                           on_change=lambda e: state.update(reasoning_effort=e.value.lower())).classes("w-full")
             with ui.column().classes("flex-1"):
                 ui.label("Genre").classes("text-xs text-gray-500")

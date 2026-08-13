@@ -55,7 +55,7 @@ def main():
     with Progress(SpinnerColumn(),TextColumn("{task.description}"),BarColumn(),TaskProgressColumn(),TimeElapsedColumn(),TimeRemainingColumn(),console=console) as pr:
         task=pr.add_task("翻译中...",total=1)
         result=run_translation_pipeline(vars(a)|{"config":cfg},log_fn=console.print,progress_fn=lambda f,m:pr.update(task,completed=f,description=m))
-    _print_summary(cfg, result["num_chapters"], result["num_chunks"], result["num_issues"], result["num_errors"], result["output_path"], time.time()-result["elapsed_sec"] if result["elapsed_sec"] else 0)
+    _print_summary(result)
 
 def _print_header(book_path: str, cfg: dict, target_tokens: int, overlap: int):
     provider = cfg.get("provider", "custom")
@@ -90,16 +90,18 @@ def _check_cli_features(cfg: dict, args):
         console.print()
 
 
-def _print_summary(cfg: dict, num_chapters: int, num_chunks: int, num_issues: int, num_errors: int, output_path: str, start_time: float = 0):
-    cost = cfg.get("_cost", {})
-    prompt_tokens = cost.get("prompt_tokens", 0)
-    completion_tokens = cost.get("completion_tokens", 0)
+def _print_summary(result: dict):
+    num_chapters = result["num_chapters"]
+    num_chunks = result["num_chunks"]
+    num_issues = result["num_issues"]
+    num_errors = result["num_errors"]
+    output_path = result["output_path"]
 
-    elapsed = time.time() - start_time if start_time else 0
+    elapsed = result.get("elapsed_sec", 0) or 0
     dur_str = f"{int(elapsed//60)}:{int(elapsed%60):02d}"
 
     console.print(f"Translation complete | chapters: {num_chapters} | chunks: {num_chunks} | term drifts: {num_issues} | errors: {num_errors} | elapsed: {dur_str}")
-    console.print(f"tokens used: {prompt_tokens:,} in / {completion_tokens:,} out")
+    console.print(f"tokens used: {result.get('prompt_tokens', 0):,} in / {result.get('completion_tokens', 0):,} out")
     console.print(f"output: {output_path}")
     if num_errors > 0:
         console.print(f"\n[yellow]Re-run to skip completed chunks and retry the remaining {num_errors} failed ones[/yellow]")

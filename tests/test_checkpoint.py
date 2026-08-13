@@ -144,3 +144,42 @@ def test_checkpoint_resume_skipped_progress_persisted(tmp_path):
     translate_chapter("测试章", chunks, None, consistency, {}, {}, llm3, config,
                       checkpoint_path=cp_path)
     assert llm3.call_count == 0, "全部完成后不应再调用 LLM"
+
+
+def test_checkpoint_save_throttled(monkeypatch, tmp_path):
+    """v1.5.1：checkpoint 节流 —— 12 块全成功时只落盘 2 次（第 10 块 + 章末）。"""
+    import translator as translator_mod
+    from translator import CHECKPOINT_SAVE_INTERVAL
+
+    cp_path = str(tmp_path / "checkpoint.json")
+    chunks = [Chunk(
+        id=f"chunk_{i:04d}",
+        text=f"Sentence {i} one. Sentence {i} two. Sentence {i} three.",
+        start_sentence=i * 3,
+        end_sentence=i * 3 + 2,
+        body_start_sentence=i * 3,
+        overlap_sentences=0,
+        sentences=[f"Sentence {i} one.", f"Sentence {i} two.", f"Sentence {i} three."],
+    ) for i in range(12)]
+
+    def llm(sp, up, tier=None):
+        return (TARGET, {"prompt_tokens": 1, "completion_tokens": 1})
+
+    saves = []
+    real_save = translator_mod._save_checkpoint
+
+    def counting_save(*args, **kwargs):
+        saves.append(args[1])  # translations dict
+        return real_save(*args, **kwargs)
+
+    monkeypatch.setattr(translator_mod, "_save_checkpoint", counting_save)
+
+    translations, errors = translate_chapter(
+        "测试章", chunks, None, Mock(), {}, {}, llm,
+        {"genre": "auto"}, checkpoint_path=cp_path,
+    )
+    assert errors == []
+    assert len(translations) == 12
+    assert len(saves) == 2, f"12 块应落盘 2 次（每 {CHECKPOINT_SAVE_INTERVAL} 块 + 章末），实际 {len(saves)} 次"
+    cp = _load_cp(cp_path)
+    assert len(cp["completed_chunks"]) == 12  # 章末兜底保存完整进度
