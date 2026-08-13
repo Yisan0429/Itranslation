@@ -42,13 +42,13 @@ console = Console()
 
 def main():
     parser=argparse.ArgumentParser(description="book-translation — AI 全书翻译工具")
-    parser.add_argument("book"); parser.add_argument("--config",default=None); parser.add_argument("--genre",default="auto"); parser.add_argument("--provider",default="custom"); parser.add_argument("--model",default="deepseek-v4-pro"); parser.add_argument("--api-key",default=None); parser.add_argument("--api-base",default=None); parser.add_argument("--no-vision",action="store_true"); parser.add_argument("--no-preread",action="store_true"); parser.add_argument("--no-rat",action="store_true"); parser.add_argument("--reflect",action="store_true"); parser.add_argument("--reflect-depth",type=int,default=1); parser.add_argument("--target-tokens",type=int,default=1500); parser.add_argument("--overlap",type=int,default=None); parser.add_argument("--output",default=None); parser.add_argument("--format",default="txt"); parser.add_argument("--parallel",type=int,default=0); parser.add_argument("--clear-cache",action="store_true"); parser.add_argument("-v","--verbose",action="store_true")
+    parser.add_argument("book"); parser.add_argument("--config",default=None); parser.add_argument("--genre",default="auto"); parser.add_argument("--provider",default="custom"); parser.add_argument("--model",default="deepseek-v4-pro"); parser.add_argument("--api-key",default=None); parser.add_argument("--api-base",default=None); parser.add_argument("--no-vision",action="store_true"); parser.add_argument("--no-preread",action="store_true"); parser.add_argument("--no-rat",action="store_true"); parser.add_argument("--reflect",action="store_true"); parser.add_argument("--reflect-depth",type=int,default=1); parser.add_argument("--target-tokens",type=int,default=None); parser.add_argument("--overlap",type=int,default=None); parser.add_argument("--output",default=None); parser.add_argument("--format",default="txt"); parser.add_argument("--parallel",type=int,default=0); parser.add_argument("--clear-cache",action="store_true"); parser.add_argument("-v","--verbose",action="store_true")
     a=parser.parse_args(); cfg=load_config(a.config); cfg.update(provider=a.provider,model=a.model); cfg["genre"]=a.genre if a.genre!="auto" else cfg.get("genre","auto")
     if a.api_key: cfg["api_key"]=a.api_key
     if a.api_base: cfg["api_base"]=a.api_base
     if a.overlap is not None: cfg["overlap_by_genre"][cfg["genre"]]=a.overlap
     if a.reflect: cfg.update(enable_reflection=True,reflection_depth=a.reflect_depth)
-    _print_header(a.book,cfg,a.target_tokens,a.overlap if a.overlap is not None else cfg["overlap_by_genre"].get(cfg.get("genre","auto"),3)); _check_cli_features(cfg,a)
+    _print_header(a.book,cfg,a.target_tokens or cfg["chunk_target_tokens"],a.overlap if a.overlap is not None else cfg["overlap_by_genre"].get(cfg.get("genre","auto"),3)); _check_cli_features(cfg,a)
     from pipeline import run_translation_pipeline
     with Progress(SpinnerColumn(),TextColumn("{task.description}"),BarColumn(),TaskProgressColumn(),TimeElapsedColumn(),TimeRemainingColumn(),console=console) as pr:
         task=pr.add_task("翻译中...",total=1)

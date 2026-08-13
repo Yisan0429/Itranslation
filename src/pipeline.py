@@ -35,7 +35,7 @@ def run_translation_pipeline(params:dict,log_fn=None,progress_fn=None,cancel_fn=
  for ch in chapters:
   if cancel(): return _result(None,chapters,groups,[],errors,started,cfg)
   t='\n\n'.join(ch.get('paragraphs',[]))
-  if t.strip(): groups.append((ch['title'],chunk_text(t,target_tokens=params.get('target_tokens',1500),max_tokens=cfg.get('chunk_max_tokens',3000),overlap_sentences=overlap)))
+  if t.strip(): groups.append((ch['title'],chunk_text(t,target_tokens=params.get('target_tokens') or cfg.get('chunk_target_tokens',3000),max_tokens=cfg.get('chunk_max_tokens',6000),overlap_sentences=overlap)))
  total=sum(len(x) for _,x in groups); chars=sum(len(c.text) for _,xs in groups for c in xs); est_tokens=int(chars*1.8); log(f'Precheck estimate:\n  total chars: {chars:,}\n  total chunks: {total}\n  estimated tokens: ~{est_tokens:,}'); progress(.15,f'Phase 2: Translation ({total} chunks)'); shared=ConsistencyModel(threshold=cfg.get('consistency_alert_threshold',0.8)); results=[]; vs=None
  if not params.get('no_rat',False):
   vs=TranslationVectorStore(persist_dir=cfg['vector_store_dir'],use_gpu=cfg.get('use_gpu',True))
