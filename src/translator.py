@@ -278,6 +278,19 @@ def translate_chapter(
             term_batch, llm_call, config, consistency_model, cost_lock, term_max,
         )
 
+    # 章末兜底保存：续跑时被跳过的块不会在循环内触发保存，
+    # 若不在此兜底，checkpoint 会丢失跳过块的进度，下一次运行会重复翻译它们。
+    if checkpoint_path:
+        _save_checkpoint(
+            checkpoint_path,
+            {ch.id: t for ch, t in zip(chunks[:len(translations)], translations)},
+            chapter_title,
+            len(translations),
+            len(chunks),
+            content_hash,
+            failed_ids,
+        )
+
     return translations, errors
 
 

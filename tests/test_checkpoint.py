@@ -84,3 +84,63 @@ def test_checkpoint_three_state(tmp_path):
     assert llm.call_count == calls_before, "已完成的块不应再调用 LLM"
     assert errors == []
     assert translations == [TARGET]
+
+
+class PartialFailLLM:
+    """仅 chunk_0000 失败一次，其余全部成功。"""
+
+    def __init__(self):
+        self.call_count = 0
+        self.failed_0000 = False
+
+    def __call__(self, system, user, tier=None):
+        self.call_count += 1
+        if not self.failed_0000:
+            self.failed_0000 = True
+            raise RuntimeError("API down")
+        return (TARGET, {"prompt_tokens": 1, "completion_tokens": 1})
+
+
+def _make_three_chunks():
+    return [Chunk(
+        id=f"chunk_{i:04d}",
+        text=f"Sentence {i} one. Sentence {i} two. Sentence {i} three.",
+        start_sentence=i * 3,
+        end_sentence=i * 3 + 2,
+        body_start_sentence=i * 3,
+        overlap_sentences=0,
+        sentences=[f"Sentence {i} one.", f"Sentence {i} two.", f"Sentence {i} three."],
+    ) for i in range(3)]
+
+
+def test_checkpoint_resume_skipped_progress_persisted(tmp_path):
+    """续跑后 checkpoint 必须包含被跳过块的进度，否则下次运行会重复翻译。"""
+    cp_path = str(tmp_path / "checkpoint.json")
+    chunks = _make_three_chunks()
+    config = {"genre": "auto"}
+    consistency = Mock()
+
+    # 第 1 次：chunk_0000 失败，0001/0002 成功
+    llm = PartialFailLLM()
+    translate_chapter("测试章", chunks, None, consistency, {}, {}, llm, config,
+                      checkpoint_path=cp_path)
+    cp = _load_cp(cp_path)
+    assert set(cp["completed_chunks"]) == {"chunk_0001", "chunk_0002"}
+    assert cp["failed_chunks"] == ["chunk_0000"]
+
+    # 第 2 次：重译 chunk_0000，其余跳过；结束后 checkpoint 应为 3/3 完成
+    llm2 = PartialFailLLM()
+    llm2.failed_0000 = True  # 本次不再失败
+    translate_chapter("测试章", chunks, None, consistency, {}, {}, llm2, config,
+                      checkpoint_path=cp_path)
+    cp = _load_cp(cp_path)
+    assert set(cp["completed_chunks"]) == {"chunk_0000", "chunk_0001", "chunk_0002"}, \
+        f"续跑后 checkpoint 丢失跳过块进度: {cp['completed_chunks']}"
+    assert cp["failed_chunks"] == []
+    assert set(cp["translations"].keys()) == {"chunk_0000", "chunk_0001", "chunk_0002"}
+
+    # 第 3 次：全部跳过，LLM 零调用
+    llm3 = PartialFailLLM()
+    translate_chapter("测试章", chunks, None, consistency, {}, {}, llm3, config,
+                      checkpoint_path=cp_path)
+    assert llm3.call_count == 0, "全部完成后不应再调用 LLM"
