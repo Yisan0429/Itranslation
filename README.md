@@ -16,7 +16,7 @@
   Sentence-Level Chunking · Overlap Redundancy · RAT · KG Pre-Read · Reflection · Consistency Audit · Checkpoint/Resume · Token Tracking
 </p>
 
-> This project is under active development. Test with short texts (< 3,000 words) before processing larger files. Translations may be interrupted by network issues or API errors.
+> Test with short texts (< 3,000 words) before processing larger files. Translations may be interrupted by network issues or API errors.
 
 ---
 
